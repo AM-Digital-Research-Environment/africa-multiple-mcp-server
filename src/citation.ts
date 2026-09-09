@@ -251,7 +251,7 @@ function toRis(
 
 /** CSL names: "Surname, Forename" splits into family/given; anything without a
  * comma is an organisation and stays `literal` so citeproc does not invert it. */
-function cslName(name: string): Record<string, string> {
+export function cslName(name: string): Record<string, string> {
   const comma = name.indexOf(",");
   if (comma === -1) return { literal: name };
   const family = name.slice(0, comma).trim();

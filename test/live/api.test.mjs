@@ -67,6 +67,21 @@ test("publication full text: open-access records carry bibo:content > 10k chars"
   assert.ok(pubs.some((p) => p.fulltext && p.fulltext.length > 10000), "extracted full text > 10k chars");
 });
 
+test("publication detail mappings retain live conference, extent, access and authority metadata", async () => {
+  // Stable examples from the September 2026 bibliography review. Compare source
+  // values so a curator correcting a label does not invalidate the mapping test.
+  const responses = await Promise.all([29928, 29935, 29949, 29926].map((id) => get(`${API}/items/${id}`)));
+  const [book, conference, thesis, linked] = responses.map(({ body }) => transformPublication(body, ctx, null));
+  assert.ok(book.num_pages);
+  assert.equal(book.num_pages, responses[0].body["bibo:numPages"][0]["@value"]);
+  assert.ok(book.publisher_ref?.o_id);
+  assert.ok(book.access_rights.length);
+  assert.deepEqual(conference.conference_details, responses[1].body["bibo:presentedAt"].map((v) => v["@value"]));
+  assert.ok(thesis.advisers.some((r) => r.o_id));
+  assert.ok(thesis.degree_granting_institutions.length);
+  assert.equal(linked.external_links[0].url, responses[3].body["fabio:hasURL"][0]["@id"]);
+});
+
 test("journals: the venue authority (template 23) exists and transforms", async () => {
   const { body, headers } = await get(`${API}/items?resource_template_id=23&per_page=5`);
   const total = Number(headers.get("omeka-s-total-results"));

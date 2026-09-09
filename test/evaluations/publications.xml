@@ -20,4 +20,12 @@
     <question>For the 9 September 2026 snapshot, compare the collection overview's full-text publication count with search_publications filtered by has_fulltext=true. Return the total count after verifying the two agree.</question>
     <answer>60</answer>
   </qa_pair>
+  <qa_pair>
+    <question>Export all French-language publications as RIS using search_publications on the 9 September 2026 snapshot. Follow next_offset until has_more is false, count the complete entries, and compare that count with list_publication_facets filtered to French. Return the matching total as an integer.</question>
+    <answer>38</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Read publication 29949 and identify its thesis adviser Kaime, Thoko. Return the adviser's linked AMIRA authority URL from the publication detail, without constructing a URL from the person's name.</question>
+    <answer>https://data.africamultiple.uni-bayreuth.de/s/amira/item/315</answer>
+  </qa_pair>
 </evaluation>

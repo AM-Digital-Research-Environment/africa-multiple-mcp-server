@@ -138,8 +138,9 @@ a tool's max and it caps silently but tells you — the envelope echoes `request
 ### 3 — Drill
 `get_research_item` (by Omeka `id` / `omeka_id`) returns the full record — including the **typed dates**, the
 place hierarchy and a ready-to-paste `generated_citation` + `bibtex`. `get_project`, `get_research_section`, `get_person`, `get_institution`,
-`get_publication` (with generated BibTeX, peer-review status, funders, and the venue's own
-`amira_url` when it is a Journal record), `get_podcast`, `get_video` complete the detail layer.
+`get_publication` (with citation exports, peer-review status, funders, linked contributors/publisher,
+conference/extent/access/thesis metadata, and the venue's `amira_url` when it is a Journal record),
+`get_podcast`, `get_video` complete the detail layer.
 **Transcripts and publication full text are opt-in:** `get_podcast` / `get_video` omit the transcript
 by default (you still see `has_transcript` + `transcript_length`); pass `include_transcript=true` for
 the text, and `transcript_offset` / `transcript_max_chars` to page a long one. `get_publication`
@@ -179,8 +180,14 @@ link.
 - **When a formal reference is wanted, don't assemble one by hand.** `get_research_item` returns
   `generated_citation` (creator + role, medium, date, collection, holding repository, `amira_url`)
   and a `bibtex` entry; `citation_format=ris` / `csl-json` returns `ris` / `csl_json` instead, for a
-  reference manager. `get_publication` does the same with `bibtex`. If the item carries a curated
+  reference manager. `get_publication` supports the same `citation_format` choices. If the item carries a curated
   `citation[]` (only 31 of ~4,000 do), quote that verbatim and treat the generated one as a fallback.
+- To export a filtered bibliography, add `citation_format=ris`, `bibtex`, or `csl-json` to
+  `search_publications`. Results contain complete export entries in `ris`, `bibtex`, or `csl_json`
+  instead of ordinary summaries. Follow `next_offset` until `has_more=false`: batches cap at 25
+  records and may stop earlier at the response byte limit. Combine strings with blank lines, or
+  collect CSL objects into a JSON array. Exports omit abstracts/full text. See the bibliography
+  section of [references/tools-by-task.md](references/tools-by-task.md) for details.
 
 ## Caveats
 

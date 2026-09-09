@@ -81,7 +81,7 @@ Call `get_collection_overview` first to scope the data, then drill in.
 | `list_collections` | Collections (item sets) ranked by research-item count — pair with the `collection` filter |
 | `list_categories` | Facet values: formats/genres, languages, resource types |
 | `list_years` | Date histogram of research items by year or decade — coverage over time, most-covered year/decade |
-| `search_publications` / `get_publication` | The cluster bibliography, filtered by author, subject, language, type, venue, year and full-text availability (incl. generated BibTeX) — **full-text search over the extracted open-access PDFs** (match snippets; full text opt-in + paged on detail) |
+| `search_publications` / `get_publication` | Filter the bibliography by author, subject, language, type, venue, year and full-text availability; search extracted PDF text. Detail adds linked authorities, conference/extent/access/thesis metadata. `citation_format` selects BibTeX/RIS/CSL-JSON for one record or a bounded batch of matching publications |
 | `list_publication_facets` | Counts by type, year, language, subject, author/editor or venue across the complete filtered bibliography; ranked and paginated |
 | `list_journals` | The journals the cluster publishes in, ranked by publication count, with ISSN and country — pair with the `venue` filter |
 | `find_related` | Cross-entity discovery: pivot from a subject/place/person/project to co-occurring entities (incl. publications) |
@@ -100,6 +100,7 @@ Call `get_collection_overview` first to scope the data, then drill in.
 | "In which talks does anyone discuss **decoloniality**?" | `search_videos keyword=decolonial` (matches inside transcripts, flagged `matched_in`) |
 | "Which cluster publications discuss **migration control** — and what do they actually say?" | `search_publications keyword="migration control"` (matches inside the extracted full text, flagged `matched_in`) → `get_publication include_fulltext=true` |
 | "How many French-language publications are there, and of which types?" | `list_publication_facets facet=type language=fr` → `search_publications language=fr` |
+| "Export the French-language bibliography for my reference manager" | `search_publications language=fr citation_format=ris` → follow `next_offset`; combine the complete `ris` records |
 | "Which journals does the cluster publish in?" | `list_journals` (ranked by publication count) |
 | "What themes travel with **Architecture** across projects?" | `find_related entity_type=subject value=Architecture` |
 | "When was this photograph taken?" | `get_research_item` → typed `dates` (created/collected/issued/…) |
@@ -268,7 +269,7 @@ absolute cap (Claude Code truncates tool results at 25,000 tokens) is fatal, as
 is any probe whose call *failed*, since a structured refusal is ~60 tokens and
 would otherwise sail under every ceiling.
 
-Current measured baseline: **8,278 tokens** stdio / **9,492 tokens** HTTP surface; heaviest response is
+Current measured baseline: **8,329 tokens** stdio / **9,543 tokens** HTTP surface; heaviest response is
 `search_research_items` at `limit=100`, ~15,000 tok. Defaults are far cheaper —
 a keyword search is ~165 tok.
 

@@ -62,6 +62,126 @@ test("fetch misses are MCP tool errors, with the same structured content", async
   assert.deepEqual(result.structuredContent, JSON.parse(result.content[0].text));
 });
 
+test("publication detail selects an export and keeps the BibTeX default", async () => {
+  const original = await call("get_publication", { id: 510 });
+  assert.ok(original.bibtex);
+  assert.deepEqual(original.author_refs, [{ label: "Fendler, Ute", omeka_id: 101, amira_url: lib.itemUrl(101) }]);
+  assert.equal(original.num_pages, null);
+  assert.deepEqual(original.external_links, []);
+  assert.deepEqual(original.advisers, []);
+  for (const [format, field] of [["ris", "ris"], ["csl-json", "csl_json"]]) {
+    const detail = await call("get_publication", { id: "eref-510", citation_format: format });
+    assert.ok(detail[field]);
+    assert.equal(detail.bibtex, undefined);
+    assert.equal(detail.fulltext, undefined);
+    const batch = await call("search_publications", { has_fulltext: true, citation_format: format });
+    assert.equal(batch.count, 1);
+    assert.deepEqual(batch.results[0][field], detail[field]);
+    assert.deepEqual(batch.results[0].identifiers, ["eref-510"]);
+    assert.equal(batch.results[0].amira_url, detail.amira_url);
+  }
+});
+
+test("publication exports paginate the same filtered records with a smaller count cap", async () => {
+  const store = await lib.ensureStore();
+  const original = [...store.publications];
+  store.publications.splice(0, store.publications.length, ...Array.from({ length: 30 }, (_, i) => ({
+    ...original[0], o_id: 1000 + i, pub_id: `eref-${1000 + i}`, title: "Same title",
+  })));
+  try {
+    for (const format of ["bibtex", "ris", "csl-json"]) {
+      const first = await call("search_publications", { language: "en", citation_format: format, limit: 100 });
+      assert.equal(first.count, 25);
+      assert.equal(first.total_matches, 30);
+      assert.equal(first.effective_limit, 25);
+      assert.equal(first.requested_limit, 100);
+      assert.equal(first.next_offset, 25);
+      assert.deepEqual(first.filters, { language: "en" });
+      const last = await call("search_publications", { language: "en", citation_format: format, offset: first.next_offset });
+      assert.equal(last.count, 5);
+      assert.equal(last.has_more, false);
+      assert.equal(last.next_offset, undefined);
+      const ids = [...first.results, ...last.results].map((r) => r.omeka_id);
+      assert.deepEqual(ids, Array.from({ length: 30 }, (_, i) => 1000 + i));
+      const absent = await call("search_publications", { language: "fr", citation_format: format });
+      assert.equal(absent.total_matches, 0);
+      assert.deepEqual(absent.results, []);
+    }
+    assert.equal((await call("search_publications", { limit: 100 })).count, 30);
+  } finally { store.publications.splice(0, store.publications.length, ...original); }
+});
+
+test("publication export byte bounds preserve whole records and advance without skips", async () => {
+  const store = await lib.ensureStore();
+  const original = [...store.publications];
+  store.publications.splice(0, store.publications.length, ...Array.from({ length: 3 }, (_, i) => ({
+    ...original[0], o_id: 1000 + i, pub_id: `eref-${1000 + i}`, title: `${i} ${"é".repeat(15_000)}`,
+  })));
+  try {
+    for (const format of ["bibtex", "ris", "csl-json"]) {
+      let offset = 0;
+      const ids = [];
+      do {
+        const result = await client.callTool({ name: "search_publications", arguments: { citation_format: format, offset } });
+        assert.ok(Buffer.byteLength(result.content[0].text, "utf8") <= 60_000);
+        const page = result.structuredContent;
+        assert.ok(page.count > 0 && page.count < 3);
+        ids.push(...page.results.map((r) => r.omeka_id));
+        for (const record of page.results) {
+          if (format === "ris") assert.match(record.ris, /\nER  - $/);
+          else if (format === "bibtex") assert.match(record.bibtex, /\n}$/);
+          else assert.equal(record.csl_json.title.length, 15_002);
+        }
+        if (!page.has_more) break;
+        assert.equal(page.response_limited, true);
+        assert.equal(page.next_offset, offset + page.count);
+        offset = page.next_offset;
+      } while (offset < 3);
+      assert.deepEqual(ids, [1000, 1001, 1002]);
+    }
+    store.publications[0].title = "oversized-only " + "é".repeat(60_000);
+    const oversized = await client.callTool({ name: "search_publications", arguments: { citation_format: "ris", keyword: "oversized-only" } });
+    assert.equal(oversized.isError, true);
+    assert.equal(oversized.structuredContent.error.code, "export_too_large");
+    assert.equal(oversized.structuredContent.error.suggested_tool, "get_publication");
+  } finally { store.publications.splice(0, store.publications.length, ...original); }
+});
+
+test("richer publication detail and all export formats respect exposure settings", async () => {
+  const p = (await lib.ensureStore()).getPublication("510");
+  const fields = {
+    publisher_ref: { label: "Publisher", o_id: 1324 },
+    advisers: [{ label: "Secret adviser", o_id: 315 }, { label: "Literal adviser", o_id: null }],
+    degree_granting_institutions: [{ label: "Secret university", o_id: null }],
+    conference_details: ["Secret conference"], access_rights: ["Open access"],
+    num_pages: "202", external_links: [{ url: "https://example.org/publisher", label: "Publisher page" }],
+  };
+  Object.assign(p, fields);
+  try {
+    const detail = await call("get_publication", { id: 510 });
+    assert.equal(detail.publisher_ref.amira_url, lib.itemUrl(1324));
+    assert.equal(detail.advisers[0].amira_url, lib.itemUrl(315));
+    assert.equal(detail.advisers[1].amira_url, null);
+    assert.equal(detail.num_pages, "202");
+    assert.equal(detail.external_links[0].url, "https://example.org/publisher");
+    for (const level of ["minimal", "descriptive"]) {
+      process.env.AMIRA_EXPOSURE = level;
+      for (const format of ["bibtex", "ris", "csl-json"]) {
+        const detail = await call("get_publication", { id: 510, citation_format: format });
+        assert.equal(detail.advisers, undefined);
+        assert.equal(detail.author_refs, undefined);
+        assert.equal(detail.publisher_ref, undefined);
+        assert.doesNotMatch(JSON.stringify(detail), /Secret|Literal adviser|Fendler|Society/);
+        const page = await call("search_publications", { citation_format: format });
+        assert.doesNotMatch(JSON.stringify(page), /Secret|Literal adviser|Fendler|Society|Beier/);
+      }
+    }
+  } finally {
+    delete process.env.AMIRA_EXPOSURE;
+    for (const key of Object.keys(fields)) delete p[key];
+  }
+});
+
 test("publication language/subject filters and invalid date ranges", async () => {
   const result = await call("search_publications", { language: "en", subject: "Architecture" });
   assert.equal(result.total_matches, 1);

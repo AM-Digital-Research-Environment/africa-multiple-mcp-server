@@ -2,6 +2,20 @@
 
 ## Current work — September 2026
 
+**Version 1.17.0:** publication RIS and CSL-JSON alongside
+BibTeX, bounded bibliography exports through `search_publications`, and richer
+publication detail (conference descriptions, page extent, supplementary links,
+access/rights statements, thesis advisers and linked contributor/publisher IDs).
+Exports share search filters, preserve repository aliases, respect exposure
+settings, and page whole records within count and byte limits. The companion
+skill and [publication guide](docs/publications.md) document the workflow.
+
+Validation: 110 unit tests, 11 live API tests, both protocol smoke suites,
+strict skill/manifest checks, and response budgets. All 562 publications were
+exported in each format without duplicate or skipped IDs; the CSL-JSON corpus
+passed the official input schema. Two further dated functional retrieval cases
+cover filtered RIS export and a linked thesis adviser.
+
 Version 1.16.0 adds publication facets, language/subject filters, repository
 aliases and series metadata; corrects citation exposure and MCP error reporting;
 and strengthens snapshot validation, local HTTP defaults, MCP App message handling,
@@ -25,30 +39,22 @@ below. The historical progress log records earlier releases and their datasets.
    transactional snapshot or detect every change with coarse timestamps. Validate
    manifest API provenance against configuration when changing `AMIRA_SITE_BASE`,
    so unrelated cached records cannot acquire the new site's citation URLs.
-2. **Publication RIS/CSL-JSON and bounded bibliography export.** Reuse research-item
-   citation conventions, with coverage for editors, corporate authors, journals,
-   theses and series. Bound export pages and preserve all repository identifiers.
-3. **Richer publication detail.** The September public-data check found conference
-   metadata (`bibo:presentedAt`) on 40 records, supplementary links (`fabio:hasURL`)
-   on 70, and page extent (`bibo:numPages`) on 81. Map these separately from venue
-   and page ranges, alongside rights and thesis advisers. Preserve linked
-   publisher/person IDs for future profiles. Missing PDFs do not imply closed access.
-4. **Selective output schemas.** Add useful contracts to rich tools, including
+2. **Selective output schemas.** Add useful contracts to rich tools, including
    exposure variants and errors. HTTP discovery has about 500 estimated tokens of
    headroom; broad schema expansion needs a tool-profile or discovery design.
-5. **Retrieval and disambiguation evaluations.** Compare substring/term ranking
+3. **Retrieval and disambiguation evaluations.** Compare substring/term ranking
    with phrase/BM25 approaches on dated questions before adding a search service.
    Label facets can merge homonyms: future co-author networks should use authority
    IDs and preserve literal contributors separately. The
    [publication cases](test/evaluations/publications.xml) are functional checks,
    not a blind model evaluation.
-6. **Input consistency.** Extend inverted-date-range validation to media searches
+4. **Input consistency.** Extend inverted-date-range validation to media searches
    and bound free-text query lengths. Publication and research-item filters reject
    inverted ranges; podcast/video searches currently return no hits.
-7. **Refresh operations.** Expose last success/failure and in-flight status in
+5. **Refresh operations.** Expose last success/failure and in-flight status in
    health/overview without filesystem paths. Retry only transient HTTP failures,
    honor `Retry-After`, and keep the last usable data serving during failures.
-8. **Container validation.** The Docker build now copies and validates the embedded
+6. **Container validation.** The Docker build now copies and validates the embedded
    skill source. A full image build/run remains to be checked before container
    deployment; Docker's daemon was unavailable during the September local review.
 

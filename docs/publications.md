@@ -67,11 +67,65 @@ deduplication. For example, the aliases `eref-95983` and `epub-9405` resolve to
 in the September snapshot. These aliases are lookup keys; cite the public page.
 
 Detail includes `identifiers`, `series` (separate from the containing `venue`),
-repository URLs, authors/editors, and generated `bibtex`. Corporate names are
+repository URLs, authors/editors, and generated `bibtex` by default. Corporate names are
 brace-protected. Unsupported BibTeX categories retain their original type in a
 neutral `misc` entry instead of claiming a different qualification or medium.
 The bibliography export links to the DOI/repository; in a research answer,
 cite `amira_url` and add the DOI as a supplementary link when useful.
+
+Choose an alternative export with `citation_format`:
+
+```json
+{"id":"29919","citation_format":"csl-json"}
+```
+
+`bibtex`, `ris`, and `csl-json` select the response fields `bibtex`, `ris`, and
+`csl_json` respectively. CSL-JSON returns an object; the other formats return a
+record string. Exports preserve the AMIRA source link and repository identifiers
+in their notes. CSL-JSON distinguishes literal corporate names from personal
+names, and all formats keep authors and editors separate. Exports omit abstracts
+and full text; read those through the detail fields below.
+
+## Export a filtered bibliography
+
+Pass `citation_format` to `search_publications` to replace its ordinary summaries
+with citation entries for the same matching records:
+
+```json
+{"language":"fr","citation_format":"ris","limit":25}
+```
+
+Each result contains `id`, `omeka_id`, `identifiers`, `amira_url`, and the selected
+export field. Filtering and newest-first ordering match ordinary search, with
+Omeka ID breaking ties between identical years/titles. Follow `next_offset` until
+`has_more` is false. Join the `ris` or `bibtex` strings with blank lines, or collect
+the `csl_json` objects into a JSON array for import.
+
+Exports default to and cap at **25 records per call**, with an additional
+**60,000-byte UTF-8 limit** on the compact JSON response. An early stop sets
+`response_limited: true`; always use `next_offset`, since a page may contain fewer
+records than requested. Entries are never cut or silently skipped. A single
+oversized entry returns `export_too_large` and identifies the publication to read
+individually. Without `citation_format`, search still returns up to 100 summaries.
+
+## Richer detail and authority links
+
+| Detail field | Meaning |
+| --- | --- |
+| `author_refs`, `editor_refs`, `publisher_ref` | Labels with `omeka_id` and `amira_url`; the existing author/editor labels and publisher string remain available |
+| `conference_details` | Source conference descriptions, often combining event, location and dates; no inferred splitting |
+| `num_pages` | Total page extent, kept separately from the `pages` range or e-locator; CSL-JSON uses `number-of-pages`, text exports keep it in a note |
+| `external_links` | Supplementary publisher/web links with labels, separate from repository links |
+| `access_rights`, `rights` | Explicit source statements; empty arrays do not imply closed access or absence of copyright |
+| `advisers`, `degree_granting_institutions` | Thesis references with labels and linked authority IDs when available |
+
+Literal references have null IDs and URLs. Do not infer identity from matching
+labels alone. The 9 September data check found conference descriptions on 40
+publications, page extent on 81, supplementary links on 70, access statements on
+27, advisers on 7, and degree-granting institutions on 8. Rights statements were
+absent in that snapshot; the mapping is ready when records acquire them.
+
+## Read full text
 
 Full text is opt-in and paginated:
 
@@ -84,18 +138,18 @@ while `fulltext_truncated` is true. A missing full text means this snapshot has
 no extracted text; it does **not** establish that the publication is closed
 access. Never infer cluster output from this curated bibliography alone.
 
-The experimental metadata-exposure modes apply to filters, facets, and BibTeX
-as well as JSON. Facets require `structured`; full-text search/read requires
-`full`. Publication RIS/CSL-JSON export is not implemented yet; those formats
-are currently available for research items only.
+The experimental metadata-exposure modes apply to filters, facets, authority
+links and all citation formats, including notes inside exports. Facets and
+structured relationships require `structured`; full-text search/read requires
+`full`.
 
 ## Maintaining coverage
 
 `npm run fetch-data` rebuilds the local snapshot. Existing schema-v4 snapshots
-remain readable: `identifiers` and `series` are optional additions, with legacy
-fallbacks. Rebuild the snapshot to populate them; an unchanged older snapshot
-will not acquire new fields merely by restarting the server.
+remain readable: the additional publication fields are optional, with empty/null
+fallbacks for older records. Rebuild the snapshot to populate them; restarting an
+unchanged older snapshot does not populate newly mapped metadata.
 
-The public data audit found further useful fields (`bibo:presentedAt`,
-`fabio:hasURL`, `bibo:numPages`, rights, thesis advisers) that are not yet exposed.
-Priorities and constraints are recorded in the [roadmap](../ROADMAP.md).
+Export mappings follow the [CSL input schema](https://github.com/citation-style-language/schema/blob/master/schemas/input/csl-data.json)
+and RIS conventions checked against [Zotero's RIS translator](https://github.com/zotero/translators/blob/master/RIS.js).
+Further priorities are recorded in the [roadmap](../ROADMAP.md).

@@ -168,6 +168,15 @@ export interface PublicationRec {
   identifiers?: string[];
   /** dre:series; distinct from the containing journal/book in venue. */
   series?: string[];
+  /** Optional additions: old schema-v4 snapshots remain readable. */
+  conference_details?: string[];
+  num_pages?: string | null;
+  external_links?: { url: string; label: string | null }[];
+  access_rights?: string[];
+  rights?: string[];
+  advisers?: LinkedRef[];
+  degree_granting_institutions?: LinkedRef[];
+  publisher_ref?: LinkedRef | null;
   /** Friendly type from the fabio class: article, book, chapter, … */
   type: string;
   title: string;

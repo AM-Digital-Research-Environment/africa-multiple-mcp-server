@@ -68,6 +68,10 @@ const OVER_LIMIT = 100_000;
  */
 const REQUIRED_ARGS = {
   search: [{ suffix: "max", args: { query: "Africa" } }],
+  search_publications: [
+    { suffix: "max", args: {} },
+    ...["bibtex", "ris", "csl-json"].map((citation_format) => ({ suffix: citation_format, args: { citation_format } })),
+  ],
   list_publication_facets: ["type", "year", "language", "subject", "author", "venue"].map((facet) => ({ suffix: facet, args: { facet } })),
   list_categories: [
     { suffix: "formats", args: { category: "formats" } },
@@ -204,6 +208,11 @@ export async function buildProbes(client) {
   const pub = await first("search_publications", { has_fulltext: true, limit: 1 });
   if (pub?.id) add("get_publication@fulltext", "get_publication", { id: pub.id, include_fulltext: true });
   else miss("get_publication@fulltext");
+  if (pub?.id) {
+    for (const citation_format of ["ris", "csl-json"]) {
+      add(`get_publication@${citation_format}`, "get_publication", { id: pub.id, citation_format });
+    }
+  }
 
   const pod = (await results("search_podcasts", { limit: OVER_LIMIT })).find((p) => p.has_transcript);
   if (pod?.id) add("get_podcast@transcript", "get_podcast", { id: pod.id, include_transcript: true });

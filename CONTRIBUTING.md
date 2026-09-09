@@ -92,7 +92,10 @@ files moved. The history reads as a changelog — keep it readable.
 ## Publication changes
 
 Use item set **29918**, never a range of publication template ids. Search and
-facets share `src/publicationQuery.ts`; add filters there so counts and retrieval
-agree. Preserve all repository identities during transformation. Keep optional
+facets and exports share `src/publicationQuery.ts`; add filters there so counts
+and retrieval agree. `src/publicationCitation.ts` owns citation mappings and
+`src/publicationExport.ts` bounds batches without cutting entries. Add every export
+format to response probes when changing this contract. Preserve all repository
+identities during transformation. Keep optional
 v4 fields backwards compatible, or bump the snapshot schema for required changes.
 See [the publication guide](docs/publications.md) and [roadmap](ROADMAP.md).

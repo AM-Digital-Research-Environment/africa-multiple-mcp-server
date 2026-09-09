@@ -3,17 +3,17 @@
   "surface": {
     "stdio": {
       "tool_count": 27,
-      "total_chars": 33001,
-      "total_tokens": 8278,
+      "total_chars": 33205,
+      "total_tokens": 8329,
       "tools": {
         "search_research_items": 673,
         "list_publication_facets": 621,
+        "search_publications": 469,
         "find_related": 434,
-        "search_publications": 394,
         "list_years": 383,
-        "get_publication": 370,
         "search_videos": 363,
         "search_projects": 360,
+        "get_publication": 346,
         "get_research_item": 338,
         "search_podcasts": 336,
         "get_podcast": 313,
@@ -37,19 +37,19 @@
     },
     "http": {
       "tool_count": 29,
-      "total_chars": 37839,
-      "total_tokens": 9492,
+      "total_chars": 38043,
+      "total_tokens": 9543,
       "tools": {
         "fetch": 732,
         "search_research_items": 673,
         "list_publication_facets": 621,
         "search": 482,
+        "search_publications": 469,
         "find_related": 434,
-        "search_publications": 394,
         "list_years": 383,
-        "get_publication": 370,
         "search_videos": 363,
         "search_projects": 360,
+        "get_publication": 346,
         "get_research_item": 338,
         "search_podcasts": 336,
         "get_podcast": 313,
@@ -137,6 +137,18 @@
       "tokens": 11090,
       "chars": 44300
     },
+    "search_publications@bibtex": {
+      "tokens": 4513,
+      "chars": 18009
+    },
+    "search_publications@ris": {
+      "tokens": 5073,
+      "chars": 20243
+    },
+    "search_publications@csl-json": {
+      "tokens": 5917,
+      "chars": 23621
+    },
     "list_publication_facets@type": {
       "tokens": 187,
       "chars": 745
@@ -198,8 +210,16 @@
       "chars": 8574
     },
     "get_publication@fulltext": {
-      "tokens": 7154,
-      "chars": 28412
+      "tokens": 7576,
+      "chars": 30100
+    },
+    "get_publication@ris": {
+      "tokens": 1207,
+      "chars": 4824
+    },
+    "get_publication@csl-json": {
+      "tokens": 1270,
+      "chars": 5076
     },
     "get_podcast@transcript": {
       "tokens": 6384,

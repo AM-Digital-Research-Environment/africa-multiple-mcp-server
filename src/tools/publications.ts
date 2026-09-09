@@ -26,7 +26,8 @@ import {
   type Server,
 } from "./_shared.js";
 import { itemUrl, itemUrlOrNull } from "../urls.js";
-import { publicationBibtex } from "../publicationCitation.js";
+import { publicationCitation } from "../publicationCitation.js";
+import { publicationExportPage } from "../publicationExport.js";
 import { publicationFilters, publicationFilterError, selectPublications } from "../publicationQuery.js";
 import { fold } from "../text.js";
 
@@ -40,23 +41,29 @@ export function registerPublicationTools(server: Server): void {
         "Search the ERef/EPub cluster bibliography. Filters are AND-combined; newest first. " +
         "Keyword reaches extracted PDF text, with matched_in='fulltext' and a snippet for text-only hits. " +
         "Use list_publication_facets for types, years, languages, subjects, contributors and venues; " +
-        "get_publication for detail and BibTeX. Cite amira_url; DOI/repository url is an additional link.",
+        "get_publication for detail. Set citation_format to export complete entries (no abstracts/full text); " +
+        "follow next_offset until has_more=false. Cite amira_url; DOI/repository url is an additional link.",
       annotations: annotate("Search publications"),
       inputSchema: z.strictObject({
         ...publicationFilters,
-        limit: z.number().int().min(1).optional().describe("Default 25, max 100"),
+        citation_format: z.enum(["bibtex", "ris", "csl-json"]).optional().describe("Omit for summaries; export results contain bibtex, ris or csl_json"),
+        limit: z.number().int().min(1).optional().describe("Default 25; max 100 summaries or 25 exports, also byte-bounded"),
         offset: z.number().int().min(0).max(100_000).optional(),
       }),
     },
     async (args) => {
       const store = await ensureStore();
-      const limit = capLimit(args.limit, 25, 100);
+      const maxLimit = args.citation_format ? 25 : 100;
+      const limit = capLimit(args.limit, 25, maxLimit);
       const offset = capOffset(args.offset);
       const invalid = publicationFilterError(args);
       if (invalid) return invalid;
       const { records: filtered, fulltextOnly } = selectPublications(store, args);
 
-      filtered.sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title));
+      filtered.sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title) || a.o_id - b.o_id);
+      const { citation_format, ...filters } = args;
+      const extra = { ...limitEcho(args.limit, maxLimit, limit), ...filtersEcho(filters) };
+      if (citation_format) return publicationExportPage(filtered, offset, limit, citation_format, extra);
 
       return textResult(
         pageOf(
@@ -67,7 +74,7 @@ export function registerPublicationTools(server: Server): void {
             fulltextOnly.has(p.o_id)
               ? { ...publicationSummary(p), matched_in: "fulltext", fulltext_snippet: matchSnippet(p.fulltext, args.keyword!) }
               : publicationSummary(p),
-          { ...limitEcho(args.limit, 100, limit), ...filtersEcho(args) },
+          extra,
         ),
       );
     },
@@ -79,22 +86,20 @@ export function registerPublicationTools(server: Server): void {
     {
       title: "Get publication detail",
       description:
-        "Full metadata for one publication: authors, editors, venue (with the journal's own `amira_url` " +
-        "and ISSN when it is a Journal authority record), volume/issue/pages, publisher, DOI, ISBN/ISSN, " +
-        "peer-review status, funders, places of publication, abstract, subjects, language, ERef/EPub " +
-        "links, and BibTeX generated from the structured fields. The extracted FULL TEXT is OMITTED by " +
-        "default (only has_fulltext + fulltext_length are shown) — pass include_fulltext=true and page a " +
-        "long one. Cite `amira_url`; DOI/repository `url` is an additional link. Returns " +
-        "{ error } if the id is unknown.",
+        "Publication metadata, linked authors/editors/publisher/venue, conference details, page extent, " +
+        "access statements, thesis advisers, supplementary links, and a citation export (BibTeX default). " +
+        "Full text is omitted unless include_fulltext=true; page long texts. " +
+        "Cite amira_url; DOI/repository url is an additional link. Unknown id returns { error }.",
       annotations: annotate("Get publication detail"),
       inputSchema: z.strictObject({
         id: z.union([z.string(), z.number()]).describe("Publication Omeka o:id (legacy publication keys also work)"),
+        citation_format: z.enum(["bibtex", "ris", "csl-json"]).optional().describe("Default bibtex; selects bibtex, ris or csl_json field"),
         include_fulltext: z.boolean().optional().describe("Default false — set true to include the extracted full text"),
         fulltext_offset: z.number().int().min(0).optional().describe("Start offset into the full text (chars), with include_fulltext"),
         fulltext_max_chars: z.number().int().min(1).optional().describe("Max full-text characters to return (default/max 25000)"),
       }),
     },
-    async ({ id, include_fulltext, fulltext_offset, fulltext_max_chars }) => {
+    async ({ id, citation_format, include_fulltext, fulltext_offset, fulltext_max_chars }) => {
       const store = await ensureStore();
       const p = store.getPublication(String(id));
       if (!p) {
@@ -102,6 +107,10 @@ export function registerPublicationTools(server: Server): void {
       }
       if (include_fulltext && !allowFullText()) return textAccessDisabledResult("fulltext");
       const journal = p.venue_ref?.o_id != null ? store.getJournal(p.venue_ref.o_id) : undefined;
+      const citation = publicationCitation(p, citation_format);
+      const linkedDetail = (ref: LinkedRef) => ({
+        label: ref.label, omeka_id: ref.o_id, amira_url: itemUrlOrNull(ref.o_id),
+      });
 
       return textResult({
         id: String(p.o_id),
@@ -114,6 +123,14 @@ export function registerPublicationTools(server: Server): void {
           ? {
               authors: refLabels(p.authors),
               editors: refLabels(p.editors),
+              author_refs: p.authors.map(linkedDetail),
+              editor_refs: p.editors.map(linkedDetail),
+              publisher_ref: p.publisher_ref ? linkedDetail(p.publisher_ref) : null,
+              advisers: (p.advisers ?? []).map(linkedDetail),
+              degree_granting_institutions: (p.degree_granting_institutions ?? []).map(linkedDetail),
+              conference_details: p.conference_details ?? [],
+              access_rights: p.access_rights ?? [],
+              rights: p.rights ?? [],
               venue: p.venue,
               ...(p.venue_ref?.o_id != null
                 ? {
@@ -132,6 +149,7 @@ export function registerPublicationTools(server: Server): void {
         volume: p.volume,
         issue: p.issue,
         pages: p.pages,
+        num_pages: p.num_pages ?? null,
         publisher: p.publisher,
         doi: p.doi,
         isbn: p.isbn,
@@ -141,6 +159,7 @@ export function registerPublicationTools(server: Server): void {
         abstract: allowDescriptive() && p.abstract ? capText(p.abstract).text : null,
         url: p.doi ?? p.urls[0] ?? null,
         repository_urls: p.urls,
+        external_links: p.external_links ?? [],
         identifiers: p.identifiers ?? [p.pub_id],
         has_media: p.has_media,
         thumbnail: p.thumbnail,
@@ -149,7 +168,7 @@ export function registerPublicationTools(server: Server): void {
           offset: fulltext_offset,
           maxChars: fulltext_max_chars,
         }),
-        bibtex: publicationBibtex(p),
+        [citation.field]: citation.export,
         amira_url: itemUrl(p.o_id),
       });
     },

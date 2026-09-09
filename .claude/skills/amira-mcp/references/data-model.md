@@ -78,9 +78,17 @@ also `venue_omeka_id` / `venue_amira_url` / `venue_issn`, linking the Journal au
 `identifiers[]` (all ERef/EPub aliases), `series[]` (distinct from the containing venue),
 `repository_urls[]` (ERef/EPub), `url` (publication DOI/repository link), `has_media` (open-access
 PDF attached) + `thumbnail`, `amira_url` (the AMIRA record link to cite whenever possible), and
-`bibtex` (generated from the structured fields and subject to metadata-exposure settings).
+`bibtex` by default (`citation_format=ris`/`csl-json` selects `ris`/`csl_json`; all respect exposure settings).
 All repository identifiers resolve to the same publication; refreshed snapshots preserve aliases
 from deduplicated records. Older v4 snapshots remain readable but need a refresh for these fields.
+
+Detail also exposes `author_refs`, `editor_refs`, `publisher_ref`, `advisers`, and
+`degree_granting_institutions`: each reference has `label`, `omeka_id`, and `amira_url` (null IDs/URLs
+for literal references). `conference_details[]` preserves the source's combined event/location/date
+descriptions. `num_pages` is total page extent, distinct from `pages` ranges/e-locators.
+`external_links[]` carries supplementary URLs and labels; `access_rights[]` and `rights[]` preserve
+explicit source statements. Empty arrays indicate missing metadata in the loaded snapshot, not
+closed access. Structured relationships and statements are hidden below `structured` exposure.
 
 Open-access publications carry the **extracted full text** of their PDF: summaries show
 `has_fulltext`, `search_publications keyword=…` reaches into it (`matched_in: "fulltext"` +
