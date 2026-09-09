@@ -138,7 +138,7 @@ export const config = {
   /** Bind for the remote HTTP transport (server/http.js); ignored by the stdio
    * entry point. PORT/HOST are the conventional names; AMIRA_HTTP_* also work. */
   httpPort: Number(envValue("PORT") ?? envValue("AMIRA_HTTP_PORT") ?? "8787"),
-  httpHost: envValue("HOST") ?? envValue("AMIRA_HTTP_HOST") ?? "0.0.0.0",
+  httpHost: envValue("HOST") ?? envValue("AMIRA_HTTP_HOST") ?? "127.0.0.1",
   /** Browser Origin hostnames accepted by the Streamable HTTP endpoint. MCP
    * clients without an Origin header are unaffected. */
   allowedOriginHostnames: parseAllowedOriginHostnames(envValue("AMIRA_ALLOWED_ORIGINS")),

@@ -105,7 +105,7 @@ function healthBody(): Record<string, unknown> {
   return {
     name: "amira-mcp-server",
     version: VERSION,
-    status: startupError ? "error" : store ? "ok" : "loading",
+    status: store ? "ok" : startupError ? "error" : "loading",
     transport: "streamable-http",
     mcp_endpoint: MCP_PATH,
     site: config.siteBase,
@@ -121,7 +121,7 @@ function healthBody(): Record<string, unknown> {
           },
         }
       : {}),
-    ...(startupError ? { error: startupError } : {}),
+    ...(!store && startupError ? { error: "Data snapshot unavailable; check server logs." } : {}),
   };
 }
 
@@ -139,7 +139,7 @@ function healthBody(): Record<string, unknown> {
  * concurrent clients from colliding on JSON-RPC ids is preserved; the data
  * still lives in the process-wide snapshot singleton, so this stays cheap.
  */
-const mcpEntry = createMcpHandler(() => createAmiraServer({ openai: true })); // 26 rich tools + search/fetch
+const mcpEntry = createMcpHandler(() => createAmiraServer({ openai: true })); // 27 rich tools + search/fetch
 const mcpHandler = toNodeHandler(
   mcpEntry,
   { onerror: (err) => console.error("[amira] mcp handler error:", err) },
@@ -158,7 +158,7 @@ const httpServer = createServer((req, res) => {
   }
 
   if (path === "/" || path === "/healthz") {
-    sendJson(res, currentStore() && !startupError ? 200 : 503, healthBody());
+    sendJson(res, currentStore() ? 200 : 503, healthBody());
     return;
   }
 
@@ -196,8 +196,10 @@ void ensureStore()
   });
 
 httpServer.listen(config.httpPort, config.httpHost, () => {
+  const address = httpServer.address();
+  const port = address && typeof address === "object" ? address.port : config.httpPort;
   console.error(
-    `[amira] AMIRA MCP server v${VERSION} on http://${config.httpHost}:${config.httpPort}${MCP_PATH} ` +
+    `[amira] AMIRA MCP server v${VERSION} on http://${config.httpHost}:${port}${MCP_PATH} ` +
       `(site: ${config.siteBase}, live refresh: ${config.liveRefresh})`,
   );
 });

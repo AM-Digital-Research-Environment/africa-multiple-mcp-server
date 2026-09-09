@@ -68,6 +68,7 @@ const OVER_LIMIT = 100_000;
  */
 const REQUIRED_ARGS = {
   search: [{ suffix: "max", args: { query: "Africa" } }],
+  list_publication_facets: ["type", "year", "language", "subject", "author", "venue"].map((facet) => ({ suffix: facet, args: { facet } })),
   list_categories: [
     { suffix: "formats", args: { category: "formats" } },
     { suffix: "languages", args: { category: "languages" } },

@@ -622,17 +622,16 @@ export function registerOpenAITools(server: Server): void {
     async ({ id, include_transcript, transcript_offset, transcript_max_chars, include_fulltext, fulltext_offset, fulltext_max_chars, max_chars }) => {
       const store = await ensureStore();
       const maxChars = Math.max(1, Math.min(Math.floor(max_chars ?? CHARACTER_LIMIT), CHARACTER_LIMIT));
-      return textResult(
-        fetchDoc(store, id, {
-          includeTranscript: include_transcript ?? false,
-          includeFulltext: include_fulltext ?? false,
-          maxChars,
-          transcriptOffset: transcript_offset,
-          transcriptMaxChars: transcript_max_chars,
-          fulltextOffset: fulltext_offset,
-          fulltextMaxChars: fulltext_max_chars,
-        }),
-      );
+      const payload = fetchDoc(store, id, {
+        includeTranscript: include_transcript ?? false,
+        includeFulltext: include_fulltext ?? false,
+        maxChars,
+        transcriptOffset: transcript_offset,
+        transcriptMaxChars: transcript_max_chars,
+        fulltextOffset: fulltext_offset,
+        fulltextMaxChars: fulltext_max_chars,
+      });
+      return { ...textResult(payload), ...(payload.error ? { isError: true } : {}) };
     },
   );
 }

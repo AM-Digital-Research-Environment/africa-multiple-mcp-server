@@ -4,16 +4,14 @@
 // opt-in + windowable in get_publication — the same discipline as transcripts.
 import { z } from "zod";
 import { ensureStore } from "../data.js";
-import type { PublicationRec } from "../types.js";
+import type { LinkedRef } from "../types.js";
 import { allowDescriptive, allowFullText, allowStructured } from "../exposure.js";
 import {
   annotate,
-  anyContainsCI,
   capLimit,
   capOffset,
   capText,
   containsCI,
-  equalsCI,
   errorResult,
   exposureRestrictedResult,
   filtersEcho,
@@ -28,68 +26,9 @@ import {
   type Server,
 } from "./_shared.js";
 import { itemUrl, itemUrlOrNull } from "../urls.js";
-import { nameMatchesQuery } from "../names.js";
-
-const BIBTEX_ENTRY: Record<string, string> = {
-  article: "article",
-  book: "book",
-  chapter: "incollection",
-  conference: "inproceedings",
-  doctoral_thesis: "phdthesis",
-  working_paper: "techreport",
-  journal_issue: "misc",
-  book_review: "article",
-  online_post: "misc",
-  research_data: "misc",
-  // Templates 24-32, added upstream 2026-09. BibTeX has no entry for a
-  // habilitation, a series editorship or a translation, so they take the
-  // nearest honest one rather than a wrong-but-specific one.
-  preprint: "misc",
-  newspaper_article: "article",
-  legal_commentary: "incollection",
-  encyclopedia_entry: "incollection",
-  translation: "book",
-  series_editorship: "misc",
-  habilitation: "phdthesis",
-  masters_thesis: "mastersthesis",
-  bachelors_thesis: "mastersthesis",
-};
-
-/** Types whose venue is a periodical (BibTeX `journal`) rather than a book. */
-const VENUE_IS_JOURNAL = new Set(["article", "book_review", "newspaper_article"]);
-/** Types whose venue is the containing volume (BibTeX `booktitle`). */
-const VENUE_IS_BOOKTITLE = new Set([
-  "chapter",
-  "conference",
-  "legal_commentary",
-  "encyclopedia_entry",
-]);
-
-/** Minimal BibTeX from the structured fields (Omeka carries no raw BibTeX). */
-function toBibtex(p: PublicationRec): string {
-  const entry = BIBTEX_ENTRY[p.type] ?? "misc";
-  const esc = (s: string) => s.replace(/[{}]/g, "");
-  const lines: string[] = [];
-  const add = (k: string, v: string | null | undefined) => {
-    if (v) lines.push(`  ${k} = {${esc(v)}}`);
-  };
-  add("author", refLabels(p.authors).join(" and "));
-  add("editor", refLabels(p.editors).join(" and "));
-  add("title", p.title);
-  if (VENUE_IS_JOURNAL.has(p.type)) add("journal", p.venue);
-  else if (VENUE_IS_BOOKTITLE.has(p.type)) add("booktitle", p.venue);
-  else add("series", p.venue);
-  add("year", p.year != null ? String(p.year) : null);
-  add("volume", p.volume);
-  add("number", p.issue);
-  add("pages", p.pages);
-  add("publisher", p.publisher);
-  add("doi", p.doi?.replace(/^https?:\/\/(dx\.)?doi\.org\//i, ""));
-  add("isbn", p.isbn);
-  add("issn", p.issn);
-  add("url", p.doi ?? p.urls[0]);
-  return `@${entry}{${p.pub_id},\n${lines.join(",\n")}\n}`;
-}
+import { publicationBibtex } from "../publicationCitation.js";
+import { publicationFilters, publicationFilterError, selectPublications } from "../publicationQuery.js";
+import { fold } from "../text.js";
 
 export function registerPublicationTools(server: Server): void {
   // === search_publications ==================================================
@@ -98,31 +37,13 @@ export function registerPublicationTools(server: Server): void {
     {
       title: "Search publications",
       description:
-        "Search the cluster bibliography (~560 publications harvested from ERef/EPub Bayreuth: journal " +
-        "articles, books, chapters, theses, conference and working papers, plus preprints, newspaper " +
-        "articles, encyclopedia and legal-commentary entries, translations and series editorships). " +
-        "Open-access ones carry the " +
-        "extracted FULL TEXT of their PDF and keyword search reaches into it — such a hit is flagged " +
-        "`matched_in: 'fulltext'` with a `fulltext_snippet` around the match. Filters are optional and " +
-        "AND-combined; results are newest-first. Cite each result's `url` (its DOI or repository " +
-        "permalink) alongside the `amira_url`. Use get_publication for full metadata, BibTeX and the full " +
-        "text (opt-in there).",
+        "Search the ERef/EPub cluster bibliography. Filters are AND-combined; newest first. " +
+        "Keyword reaches extracted PDF text, with matched_in='fulltext' and a snippet for text-only hits. " +
+        "Use list_publication_facets for types, years, languages, subjects, contributors and venues; " +
+        "get_publication for detail and BibTeX. Cite amira_url; DOI/repository url is an additional link.",
       annotations: annotate("Search publications"),
       inputSchema: z.strictObject({
-        keyword: z.string().optional().describe("Matches title, abstract, venue, subjects — and the full text where one exists"),
-        author: z.string().optional().describe("A contributor name; either name order works"),
-        type: z
-          .string()
-          .optional()
-          .describe(
-            "article | book | chapter | conference | doctoral_thesis | working_paper | journal_issue | " +
-              "book_review | online_post | research_data | preprint | newspaper_article | legal_commentary | " +
-              "encyclopedia_entry | translation | series_editorship | habilitation | masters_thesis | bachelors_thesis",
-          ),
-        venue: z.string().optional().describe("Journal/book/series title, partial. Journal titles come from list_journals"),
-        has_fulltext: z.boolean().optional().describe("true → only publications with extracted, searchable full text"),
-        year_from: z.number().int().min(0).max(2200).optional().describe("Earliest publication year"),
-        year_to: z.number().int().min(0).max(2200).optional().describe("Latest publication year"),
+        ...publicationFilters,
         limit: z.number().int().min(1).optional().describe("Default 25, max 100"),
         offset: z.number().int().min(0).max(100_000).optional(),
       }),
@@ -131,35 +52,9 @@ export function registerPublicationTools(server: Server): void {
       const store = await ensureStore();
       const limit = capLimit(args.limit, 25, 100);
       const offset = capOffset(args.offset);
-      if (args.author && !allowStructured()) return exposureRestrictedResult("structured", "The `author` filter");
-      if (args.venue && !allowStructured()) return exposureRestrictedResult("structured", "The `venue` filter");
-
-      const fulltextOnly = new Set<number>();
-      const filtered = store.publications.filter((p) => {
-        if (args.keyword) {
-          const k = args.keyword;
-          const inMeta =
-            containsCI(p.title, k) ||
-            (allowDescriptive() && containsCI(p.abstract, k)) ||
-            (allowStructured() && (containsCI(p.venue, k) || anyContainsCI(refLabels(p.subjects), k)));
-          const inFulltext = !inMeta && allowFullText() && containsCI(p.fulltext, k);
-          if (!inMeta && !inFulltext) return false;
-          if (inFulltext) fulltextOnly.add(p.o_id);
-        }
-        if (
-          args.author &&
-          !refLabels(p.authors)
-            .concat(refLabels(p.editors))
-            .some((n) => nameMatchesQuery(n, args.author!) || containsCI(n, args.author!))
-        )
-          return false;
-        if (args.type && !equalsCI(p.type, args.type)) return false;
-        if (args.venue && !containsCI(p.venue, args.venue)) return false;
-        if (args.has_fulltext !== undefined && !!p.fulltext !== args.has_fulltext) return false;
-        if (args.year_from !== undefined && (p.year ?? -Infinity) < args.year_from) return false;
-        if (args.year_to !== undefined && (p.year ?? Infinity) > args.year_to) return false;
-        return true;
-      });
+      const invalid = publicationFilterError(args);
+      if (invalid) return invalid;
+      const { records: filtered, fulltextOnly } = selectPublications(store, args);
 
       filtered.sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title));
 
@@ -189,7 +84,7 @@ export function registerPublicationTools(server: Server): void {
         "peer-review status, funders, places of publication, abstract, subjects, language, ERef/EPub " +
         "links, and BibTeX generated from the structured fields. The extracted FULL TEXT is OMITTED by " +
         "default (only has_fulltext + fulltext_length are shown) — pass include_fulltext=true and page a " +
-        "long one. Cite the `url` (DOI or repository permalink) as the primary reference. Returns " +
+        "long one. Cite `amira_url`; DOI/repository `url` is an additional link. Returns " +
         "{ error } if the id is unknown.",
       annotations: annotate("Get publication detail"),
       inputSchema: z.strictObject({
@@ -231,6 +126,7 @@ export function registerPublicationTools(server: Server): void {
               funders: refLabels(p.funders),
               places_of_publication: refLabels(p.places_of_publication),
               relations: p.relations,
+              series: p.series ?? [],
             }
           : {}),
         volume: p.volume,
@@ -245,6 +141,7 @@ export function registerPublicationTools(server: Server): void {
         abstract: allowDescriptive() && p.abstract ? capText(p.abstract).text : null,
         url: p.doi ?? p.urls[0] ?? null,
         repository_urls: p.urls,
+        identifiers: p.identifiers ?? [p.pub_id],
         has_media: p.has_media,
         thumbnail: p.thumbnail,
         ...textWindowFields("fulltext", p.fulltext, {
@@ -252,9 +149,80 @@ export function registerPublicationTools(server: Server): void {
           offset: fulltext_offset,
           maxChars: fulltext_max_chars,
         }),
-        bibtex: toBibtex(p),
+        bibtex: publicationBibtex(p),
         amira_url: itemUrl(p.o_id),
       });
+    },
+  );
+
+  // === list_publication_facets ==============================================
+  server.registerTool(
+    "list_publication_facets",
+    {
+      title: "Publication facets",
+      description:
+        "Count publications by type, year, language, subject, author/editor or venue across the complete " +
+        "filtered bibliography. Each publication counts once per value; missing_values counts records " +
+        "without this facet. Ranked by count, paginated. Use values in search_publications filters.",
+      annotations: annotate("Publication facets"),
+      inputSchema: z.strictObject({
+        facet: z.enum(["type", "year", "language", "subject", "author", "venue"]),
+        ...publicationFilters,
+        limit: z.number().int().min(1).optional().describe("Default 25, max 100"),
+        offset: z.number().int().min(0).max(100_000).optional(),
+      }),
+      outputSchema: z.object({
+        facet: z.string(),
+        total_publications: z.number(),
+        missing_values: z.number(),
+        count: z.number(),
+        total_matches: z.number(),
+        offset: z.number(),
+        has_more: z.boolean(),
+        next_offset: z.number().optional(),
+        filters: z.record(z.string(), z.unknown()).optional(),
+        requested_limit: z.number().optional(),
+        effective_limit: z.number().optional(),
+        results: z.array(z.object({
+          value: z.string(),
+          publication_count: z.number(),
+          amira_url: z.string().optional(),
+        })),
+      }),
+    },
+    async ({ facet, ...args }) => {
+      if (!allowStructured()) return exposureRestrictedResult("structured", "list_publication_facets");
+      const invalid = publicationFilterError(args);
+      if (invalid) return invalid;
+      const store = await ensureStore();
+      const { records } = selectPublications(store, args);
+      const buckets = new Map<string, { value: string; publication_count: number; amira_url?: string }>();
+      let missing = 0;
+      for (const p of records) {
+        const literal = (value: string | null): LinkedRef[] => value ? [{ label: value, o_id: null }] : [];
+        const refs = facet === "author" ? [...p.authors, ...p.editors]
+          : facet === "subject" ? p.subjects
+          : facet === "venue" ? p.venue_ref ? [p.venue_ref] : literal(p.venue)
+          : facet === "year" ? literal(p.year == null ? null : String(p.year))
+          : literal(p[facet]);
+        const seen = new Set<string>();
+        for (const ref of refs) {
+          const key = fold(ref.label.trim());
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          const bucket = buckets.get(key) ?? { value: ref.label, publication_count: 0 };
+          bucket.publication_count++;
+          if (ref.o_id != null) bucket.amira_url ??= itemUrl(ref.o_id);
+          buckets.set(key, bucket);
+        }
+        if (!seen.size) missing++;
+      }
+      const ranked = [...buckets.values()].sort((a, b) => b.publication_count - a.publication_count || a.value.localeCompare(b.value));
+      const limit = capLimit(args.limit, 25, 100);
+      return textResult(pageOf(ranked, capOffset(args.offset), limit, (r) => r, {
+        facet, total_publications: records.length, missing_values: missing,
+        ...limitEcho(args.limit, 100, limit), ...filtersEcho(args),
+      }));
     },
   );
 

@@ -94,7 +94,7 @@ Every entity is an Omeka item with a stable public page: its **`amira_url`**
 number in that URL; use that when an identifier is needed.
 
 See [references/data-model.md](references/data-model.md) for field-level detail, and
-[references/tools-by-task.md](references/tools-by-task.md) for the full 26-tool catalogue.
+[references/tools-by-task.md](references/tools-by-task.md) for the full 27-tool catalogue.
 
 ## Workflow
 
@@ -117,7 +117,8 @@ Use the right entry point for the question:
 - Projects → `search_projects`. Sections → `list_research_sections`. People → `search_persons`.
   Institutions → `list_institutions`. Bibliography → `search_publications` (keyword reaches INTO the
   extracted full text of open-access publications — hits are flagged `matched_in: "fulltext"` with a
-  `fulltext_snippet`; filter with `has_fulltext`, `venue`, `author`, `type`, years). Journals →
+  `fulltext_snippet`; filter with `has_fulltext`, `venue`, `author`, `subject`, `language`, `type`, years).
+  Use `list_publication_facets` for complete counts and publication vocabulary. Journals →
   `list_journals` (ranked by publication count; feed a title into the `venue` filter).
 - Talks and audiovisual: `search_videos` (keyword reaches INTO transcripts; hits are flagged
   `matched_in: "transcript"` with a `transcript_snippet` around the match) and `search_podcasts`
@@ -127,7 +128,8 @@ Use the right entry point for the question:
   `list_categories` (formats/languages/resource_types), all ranked by item count. Feed a returned
   value straight back into the matching filter. `list_years` gives the date distribution (by year or
   decade) for coverage-over-time and most-covered-year questions. For date ranges, pass `from <= to`
-  / `year_from <= year_to`; inverted ranges return a structured `invalid_range` error.
+  / `year_from <= year_to`; research-item, publication and timeline tools return
+  `invalid_range` for inverted ranges. Media searches currently return no hits.
 
 Keep `limit` modest (10–25) while scoping; paginate with `offset` / `next_offset`. Ask for more than
 a tool's max and it caps silently but tells you — the envelope echoes `requested_limit` /
@@ -201,10 +203,10 @@ link.
 7. **Languages are canonical records.** One record per language ("French", code `fra`); the server
    accepts names, ISO 639-1/2 codes and the legacy bibliographic codes (`fre`, `ger`) alike.
 8. **Transcripts and full text are opt-in on detail calls.** Podcast transcripts cover all episodes;
-   video transcripts cover most videos; publication full text covers the open-access subset (~60 of
+   video transcripts cover most videos; publication full text covers the deposited PDF subset (~60 of
    ~560 — `has_fulltext` on each result tells you, and `get_collection_overview` reports the counts).
-   The open-access share is small because ERef, which supplies most of the bibliography, is
-   metadata-only; only EPub deposits carry a PDF.
+   ERef, which supplies most of the bibliography, is metadata-only; EPub deposits carry PDFs.
+   Missing extracted text does not establish that a publication is closed access.
    Absence of a transcript or full text is not an error. The detail tools omit the text unless you
    pass `include_transcript=true` / `include_fulltext=true` (see Drill).
 9. **Places: flat facet, hierarchy-aware filters.** `list_locations` is a flat, item-count-ranked list

@@ -3,6 +3,10 @@
 # the JSON snapshot. No node_modules, no native bindings, cross-platform.
 node_modules/
 
+# Generated release archives must never be nested into a later bundle.
+*.mcpb
+amira-mcp-skill.zip
+
 # Source & build config
 src/
 scripts/
@@ -28,6 +32,7 @@ smoke-http-test.mjs
 *.log
 .env
 .env.*
+.claude/settings.local.json
 
 # Repo-process docs — they describe contributing to the repo, not using the
 # extension. CITATION.cff stays: citation metadata belongs with the artifact.

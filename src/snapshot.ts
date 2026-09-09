@@ -8,7 +8,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import {
-  maxModified,
   transformItemSet,
   transformJournal,
   transformLanguage,
@@ -54,7 +53,7 @@ async function fetchJSON<T>(url: string, timeoutMs = 30000): Promise<FetchResult
       const res = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": USER_AGENT } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as T;
-      return { body, total: Number(res.headers.get("omeka-s-total-results") ?? "0") };
+      return { body, total: Number(res.headers.get("omeka-s-total-results") ?? NaN) };
     } catch (err) {
       if (attempt >= 4) throw new Error(`${url}: ${(err as Error).message}`);
       await sleep(600 * attempt * attempt);
@@ -66,8 +65,10 @@ async function fetchJSON<T>(url: string, timeoutMs = 30000): Promise<FetchResult
 
 /** All pages of one items query, with bounded page concurrency. */
 async function crawlItems(apiBase: string, query: string): Promise<{ items: OmekaItem[]; total: number }> {
+  query += "&sort_by=id&sort_order=asc";
   const first = await fetchJSON<OmekaItem[]>(`${apiBase}/items?${query}&per_page=${PER_PAGE}&page=1`);
   const total = first.total;
+  if (!Number.isSafeInteger(total) || total < 0) throw new Error(`crawl ${query}: missing or invalid total-results header`);
   const pages = Math.max(1, Math.ceil(total / PER_PAGE));
   const byPage: OmekaItem[][] = [first.body];
   const queue: number[] = [];
@@ -86,6 +87,9 @@ async function crawlItems(apiBase: string, query: string): Promise<{ items: Omek
   const items = byPage.flat();
   if (items.length !== total) {
     throw new Error(`crawl ${query}: fetched ${items.length} of ${total} items`);
+  }
+  if (new Set(items.map((item) => item["o:id"])).size !== items.length) {
+    throw new Error(`crawl ${query}: duplicate item ids; the API may have changed during pagination`);
   }
   return { items, total };
 }
@@ -126,6 +130,7 @@ export interface CrawlOutput {
 
 /** Crawl everything and transform to snapshot records. Throws on ANY shortfall. */
 export async function crawlSnapshot(apiBase: string, log: (msg: string) => void = () => {}): Promise<CrawlOutput> {
+  const before = await probeRemote(apiBase);
   const labels = await fetchPropertyLabels(apiBase);
   const classTerms = new Map<number, string>();
   const ctx: TransformContext = {
@@ -134,12 +139,10 @@ export async function crawlSnapshot(apiBase: string, log: (msg: string) => void 
   };
 
   const raw = {} as Record<CorpusName, OmekaItem[]>;
-  let modified: string | null = null;
   for (const corpus of CORPORA) {
     if (corpus === "item_sets") continue;
     const { items } = await crawlItems(apiBase, CORPUS_QUERIES[corpus]);
     raw[corpus] = items;
-    modified = maxModified(items, modified);
     log(`crawled ${corpus}: ${items.length}`);
   }
 
@@ -188,11 +191,17 @@ export async function crawlSnapshot(apiBase: string, log: (msg: string) => void 
   };
 
   const probe = await probeRemote(apiBase);
+  if (before.maxModified !== probe.maxModified || before.totalItems !== probe.totalItems) {
+    throw new Error("Omeka items changed during the crawl; keeping the previous snapshot. Retry after the upstream sync finishes.");
+  }
   const manifest: SnapshotManifest = {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     fetchedAt: new Date().toISOString(),
     apiBase,
-    maxModified: modified ?? probe.maxModified,
+    // Compare like with like: the runtime probe covers ALL items, including
+    // authorities outside the crawled corpora. A corpus-only max would cause
+    // repeated full crawls whenever such an authority was modified last.
+    maxModified: probe.maxModified,
     totalItemsOnInstance: probe.totalItems,
     counts: Object.fromEntries(CORPORA.map((c) => [c, data[c].length])) as Record<CorpusName, number>,
   };
@@ -204,6 +213,9 @@ export async function probeRemote(apiBase: string): Promise<{ maxModified: strin
   const { body, total } = await fetchJSON<OmekaItem[]>(
     `${apiBase}/items?sort_by=modified&sort_order=desc&per_page=1`,
   );
+  if (!Array.isArray(body) || !Number.isSafeInteger(total) || total < 0 || (total > 0 && !body[0])) {
+    throw new Error("Omeka freshness probe returned an invalid item list or total-results header");
+  }
   return { maxModified: body[0] ? systemDate(body[0], "o:modified") : null, totalItems: total };
 }
 
@@ -235,9 +247,13 @@ export async function loadSnapshot(dir: string): Promise<CrawlOutput> {
   for (const corpus of CORPORA) {
     const arr = JSON.parse(await fs.readFile(path.join(dir, `${corpus}.json`), "utf8"));
     if (!Array.isArray(arr)) throw new Error(`snapshot ${corpus}.json is not an array`);
-    const expected = manifest.counts[corpus];
-    if (expected != null && arr.length !== expected) {
+    const expected = manifest.counts?.[corpus];
+    if (!Number.isSafeInteger(expected) || expected < 0 || arr.length !== expected) {
       throw new Error(`snapshot ${corpus}: ${arr.length} records, manifest says ${expected}`);
+    }
+    if (arr.some((record) => !Number.isSafeInteger(record?.o_id) || record.o_id <= 0) ||
+        new Set(arr.map((record) => record.o_id)).size !== arr.length) {
+      throw new Error(`snapshot ${corpus}: invalid or duplicate Omeka ids`);
     }
     (data as unknown as Record<string, unknown[]>)[corpus] = arr;
   }

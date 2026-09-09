@@ -163,6 +163,11 @@ export interface PublicationRec {
   o_id: number;
   /** dcterms:identifier, e.g. "eref-94882" — the public publication key. */
   pub_id: string;
+  /** All repository identities, including aliases retained after deduplication.
+   * Optional for compatibility with existing v4 snapshots. */
+  identifiers?: string[];
+  /** dre:series; distinct from the containing journal/book in venue. */
+  series?: string[];
   /** Friendly type from the fabio class: article, book, chapter, … */
   type: string;
   title: string;
@@ -306,7 +311,7 @@ export interface SnapshotManifest {
   schemaVersion: number;
   fetchedAt: string;
   apiBase: string;
-  /** Max o:modified seen across all crawled items (freshness probe, D11). */
+  /** Global /api/items max o:modified (same scope as the freshness probe). */
   maxModified: string | null;
   /** Unfiltered /api/items total at crawl time (freshness probe pair, D11). */
   totalItemsOnInstance: number | null;

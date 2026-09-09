@@ -45,12 +45,78 @@ test.after(async () => {
   await fs.rm(fixtureDir, { recursive: true, force: true });
 });
 
-test("tool surface: 26 rich tools + search/fetch = 28", async () => {
+test("tool surface matches the extension manifest, plus HTTP search/fetch", async () => {
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name);
-  assert.equal(names.length, 28, names.join(", "));
+  const manifest = JSON.parse(await fs.readFile(new URL("../../manifest.json", import.meta.url), "utf8"));
+  assert.deepEqual([...names].sort(), [...manifest.tools.map((tool) => tool.name), "search", "fetch"].sort());
   for (const expected of ["list_journals", "search", "fetch", "get_collection_overview"]) {
     assert.ok(names.includes(expected), expected);
+  }
+});
+
+test("fetch misses are MCP tool errors, with the same structured content", async () => {
+  const result = await client.callTool({ name: "fetch", arguments: { id: "pub:999999999" } });
+  assert.equal(result.isError, true);
+  assert.equal(result.structuredContent.error.code, "not_found");
+  assert.deepEqual(result.structuredContent, JSON.parse(result.content[0].text));
+});
+
+test("publication language/subject filters and invalid date ranges", async () => {
+  const result = await call("search_publications", { language: "en", subject: "Architecture" });
+  assert.equal(result.total_matches, 1);
+  assert.equal(result.results[0].omeka_id, 510);
+  assert.equal((await call("search_publications", { language: "French" })).total_matches, 0);
+  for (const name of ["search_publications", "list_publication_facets"]) {
+    const result = await client.callTool({ name, arguments: {
+      ...(name === "list_publication_facets" ? { facet: "type" } : {}), year_from: 2025, year_to: 2020,
+    } });
+    assert.equal(result.isError, true);
+    assert.equal(result.structuredContent.error.code, "invalid_range");
+  }
+});
+
+test("publication facets count the full filtered corpus and paginate values", async () => {
+  const types = await call("list_publication_facets", { facet: "type", limit: 1 });
+  assert.equal(types.total_publications, 2);
+  assert.equal(types.total_matches, 2);
+  assert.equal(types.has_more, true);
+  const second = await call("list_publication_facets", { facet: "type", offset: types.next_offset });
+  assert.notEqual(types.results[0].value, second.results[0].value);
+  const subject = await call("list_publication_facets", { facet: "subject" });
+  assert.equal(subject.missing_values, 1);
+  assert.equal(subject.results[0].publication_count, 1);
+  assert.match(subject.results[0].amira_url, /\/600$/);
+  const filtered = await call("list_publication_facets", { facet: "year", has_fulltext: true });
+  assert.equal(filtered.total_publications, 1);
+  assert.deepEqual(filtered.results, [{ value: "2024", publication_count: 1 }]);
+  assert.equal((await call("list_publication_facets", { facet: "venue", language: "French" })).total_matches, 0);
+});
+
+test("a person credited as both author and editor counts once per publication", async () => {
+  const store = await lib.ensureStore();
+  const pub = store.publications[0];
+  const original = pub.editors;
+  pub.editors = [...pub.authors];
+  try {
+    const result = await call("list_publication_facets", { facet: "author", has_fulltext: true });
+    assert.equal(result.results[0].publication_count, 1);
+  } finally { pub.editors = original; }
+});
+
+test("publication BibTeX and facets respect restricted metadata exposure", async () => {
+  for (const level of ["minimal", "descriptive"]) {
+    process.env.AMIRA_EXPOSURE = level;
+    try {
+      const pub = await call("get_publication", { id: 510 });
+      assert.doesNotMatch(pub.bibtex, /Fendler|Society|author =|journal =|series =/);
+      for (const filter of [{ subject: "Architecture" }, { language: "en" }]) {
+        assert.equal((await call("search_publications", filter)).error.code, "exposure_restricted");
+      }
+      const result = await client.callTool({ name: "list_publication_facets", arguments: { facet: "author" } });
+      assert.equal(result.isError, true);
+      assert.equal(result.structuredContent.error.code, "exposure_restricted");
+    } finally { delete process.env.AMIRA_EXPOSURE; }
   }
 });
 

@@ -195,7 +195,7 @@ function joinSegments(segments: (string | null | undefined)[]): string {
 /** BibTeX braces are markup; corporate names are brace-protected instead, so
  * "Institute of African and Diaspora Studies" is not split on its " and ". */
 const escBibtex = (s: string) => s.replace(/[{}]/g, "");
-const bibtexName = (name: string) => (name.includes(",") ? escBibtex(name) : `{${escBibtex(name)}}`);
+export const bibtexName = (name: string) => (name.includes(",") ? escBibtex(name) : `{${escBibtex(name)}}`);
 
 function toBibtex(
   it: ResearchItemRec,

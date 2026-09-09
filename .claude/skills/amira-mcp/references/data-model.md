@@ -75,9 +75,12 @@ persons, and contributed items (slim refs); coordinates and Wikidata link when r
 also `venue_omeka_id` / `venue_amira_url` / `venue_issn`, linking the Journal authority record),
 `volume`, `issue`, `pages`, `publisher`, `doi`, `isbn`/`issn`, `status` (peer-review flag),
 `funders[]`, `places_of_publication[]`, `subjects[]`, `abstract`, `language`,
+`identifiers[]` (all ERef/EPub aliases), `series[]` (distinct from the containing venue),
 `repository_urls[]` (ERef/EPub), `url` (publication DOI/repository link), `has_media` (open-access
 PDF attached) + `thumbnail`, `amira_url` (the AMIRA record link to cite whenever possible), and
-`bibtex` (generated from the structured fields).
+`bibtex` (generated from the structured fields and subject to metadata-exposure settings).
+All repository identifiers resolve to the same publication; refreshed snapshots preserve aliases
+from deduplicated records. Older v4 snapshots remain readable but need a refresh for these fields.
 
 Open-access publications carry the **extracted full text** of their PDF: summaries show
 `has_fulltext`, `search_publications keyword=…` reaches into it (`matched_in: "fulltext"` +

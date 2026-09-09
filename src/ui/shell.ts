@@ -74,6 +74,7 @@ export const BRIDGE_JS = String.raw`
     window.parent.postMessage({ jsonrpc: "2.0", id: id, method: method, params: params }, "*");
     return new Promise(function (resolve, reject) {
       function handler(event) {
+        if (event.source !== window.parent) return;
         var d = event.data;
         if (!d || d.id !== id) return;
         window.removeEventListener("message", handler);
@@ -94,6 +95,7 @@ export const BRIDGE_JS = String.raw`
     },
     onResult: function (render) {
       window.addEventListener("message", function (event) {
+        if (event.source !== window.parent) return;
         if (!event.data || event.data.method !== "ui/notifications/tool-result") return;
         var p = event.data.params || {};
         var payload = p.structuredContent;

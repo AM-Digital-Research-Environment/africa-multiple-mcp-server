@@ -311,6 +311,8 @@ export function transformPublication(item: OmekaItem, ctx: TransformContext, cla
   return {
     o_id: oid(item),
     pub_id: firstString(item, "dcterms:identifier") ?? `omeka-${oid(item)}`,
+    identifiers: allStrings(item, "dcterms:identifier"),
+    series: allStrings(item, "dre:series"),
     type: (term && PUB_CLASS_TO_TYPE[term]) ?? (term ? term.replace(/^fabio:/, "").toLowerCase() : "publication"),
     title: omekaTitle(item),
     date,

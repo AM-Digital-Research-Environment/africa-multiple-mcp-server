@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Functional retrieval checks verified on 2026-09-09 against the public
+     snapshot, maxModified 2026-09-04T11:16:06+00:00. Expected answers are exact
+     strings. Re-snapshot and review expectations when upstream data changes.
+     These were verified by the implementer, not as a blind model evaluation. -->
+<evaluation>
+  <qa_pair>
+    <question>Using the 9 September 2026 AMIRA snapshot, discover the publication types for French-language publications, then verify the article total with search_publications. Return total French publications and French articles as two integers separated by a comma and space.</question>
+    <answer>38, 19</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Use the collection overview and publication language facet for the 9 September 2026 snapshot to determine how many publications lack language metadata. Return the missing count as an integer; do not infer missing languages from a single search page.</question>
+    <answer>12</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Look up epub-9405 and eref-95983 separately using get_publication. Verify they resolve to the same record and return its common amira_url, without Markdown formatting.</question>
+    <answer>https://data.africamultiple.uni-bayreuth.de/s/amira/item/29919</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>For the 9 September 2026 snapshot, compare the collection overview's full-text publication count with search_publications filtered by has_fulltext=true. Return the total count after verifying the two agree.</question>
+    <answer>60</answer>
+  </qa_pair>
+</evaluation>

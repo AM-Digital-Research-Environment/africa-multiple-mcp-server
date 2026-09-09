@@ -12,6 +12,8 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
+COPY .claude/skills ./.claude/skills
+RUN npm run skills:check
 # Bundles the server (incl. server/http.js) AND writes the data/ snapshot.
 RUN npm run fetch-data
 

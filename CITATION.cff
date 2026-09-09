@@ -13,7 +13,7 @@ abstract: >-
   institutions, groups, collections, the cluster bibliography with extracted
   full text, journals, podcast episodes and YouTube videos with searchable
   transcripts, plus the places, languages and subjects that connect them —
-  as 26 typed tools that any MCP client can query. A complete data snapshot
+  as 27 typed tools that any MCP client can query. A complete data snapshot
   is bundled, so the server runs fully offline with no API key, account or
   VPN; when enabled it refreshes from the public Omeka S API. Every record
   carries an `amira_url`, so results can be cited as links back to the
@@ -37,8 +37,8 @@ contact:
     affiliation: >-
       Africa Multiple Cluster of Excellence, Digital Research Environment,
       University of Bayreuth
-version: 1.15.0
-date-released: "2026-09-04"
+version: 1.16.0
+date-released: "2026-09-09"
 license: MIT
 repository-code: "https://github.com/AM-Digital-Research-Environment/amira-mcp-server"
 url: "https://data.africamultiple.uni-bayreuth.de"

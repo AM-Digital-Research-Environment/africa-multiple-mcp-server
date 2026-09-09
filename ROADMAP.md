@@ -1,5 +1,63 @@
 # Roadmap — amira-mcp-server
 
+## Current work — September 2026
+
+Version 1.16.0 adds publication facets, language/subject filters, repository
+aliases and series metadata; corrects citation exposure and MCP error reporting;
+and strengthens snapshot validation, local HTTP defaults, MCP App message handling,
+packaging and documentation. A tested scoped dependency override resolves the
+MCPB development packaging advisory; both dependency audits are clean.
+
+The public bibliography checked on 9 September contains 562 publications,
+60 with extracted full text, across 12 populated templates. See the
+[publication guide](docs/publications.md) for current coverage and workflows.
+The dated review has been retired; its unfinished recommendations are preserved
+below. The historical progress log records earlier releases and their datasets.
+
+## Next priorities
+
+1. **Cache promotion and freshness.** Promotion currently validates staging,
+   removes the old cache, then renames staging. A rename failure or simultaneous
+   writers can lose the last refreshed cache, though bundled and in-memory data
+   remain available. Consider immutable generation directories, a pointer and a
+   writer lock. Add a signature or periodic forced refresh for item-set-only and
+   vocabulary-definition-only edits. Before/after item probes cannot establish a
+   transactional snapshot or detect every change with coarse timestamps. Validate
+   manifest API provenance against configuration when changing `AMIRA_SITE_BASE`,
+   so unrelated cached records cannot acquire the new site's citation URLs.
+2. **Publication RIS/CSL-JSON and bounded bibliography export.** Reuse research-item
+   citation conventions, with coverage for editors, corporate authors, journals,
+   theses and series. Bound export pages and preserve all repository identifiers.
+3. **Richer publication detail.** The September public-data check found conference
+   metadata (`bibo:presentedAt`) on 40 records, supplementary links (`fabio:hasURL`)
+   on 70, and page extent (`bibo:numPages`) on 81. Map these separately from venue
+   and page ranges, alongside rights and thesis advisers. Preserve linked
+   publisher/person IDs for future profiles. Missing PDFs do not imply closed access.
+4. **Selective output schemas.** Add useful contracts to rich tools, including
+   exposure variants and errors. HTTP discovery has about 500 estimated tokens of
+   headroom; broad schema expansion needs a tool-profile or discovery design.
+5. **Retrieval and disambiguation evaluations.** Compare substring/term ranking
+   with phrase/BM25 approaches on dated questions before adding a search service.
+   Label facets can merge homonyms: future co-author networks should use authority
+   IDs and preserve literal contributors separately. The
+   [publication cases](test/evaluations/publications.xml) are functional checks,
+   not a blind model evaluation.
+6. **Input consistency.** Extend inverted-date-range validation to media searches
+   and bound free-text query lengths. Publication and research-item filters reject
+   inverted ranges; podcast/video searches currently return no hits.
+7. **Refresh operations.** Expose last success/failure and in-flight status in
+   health/overview without filesystem paths. Retry only transient HTTP failures,
+   honor `Retry-After`, and keep the last usable data serving during failures.
+8. **Container validation.** The Docker build now copies and validates the embedded
+   skill source. A full image build/run remains to be checked before container
+   deployment; Docker's daemon was unavailable during the September local review.
+
+Retire the scoped `tmp` override once MCPB supplies a patched dependency upstream.
+Durable MCP tasks, OAuth, vector search and live API aggregation remain contingent
+on concrete needs for long-running jobs, restricted records or larger corpora.
+
+## Historical migration plan
+
 **Status:** drafted 2026-06-10 · spine = [issue #1](https://github.com/AM-Digital-Research-Environment/amira-mcp-server/issues/1)
 (migration epic, all design decisions resolved) + the 2026-06-10 code/data examination of v0.2.0.
 

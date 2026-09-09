@@ -39,3 +39,22 @@ maintained alongside other work, not a staffed on-call rotation.
 
 Fixes land on `main` and ship in the next tagged release. Only the latest
 release is supported — older `.mcpb` builds are not patched in place.
+
+## HTTP deployment and dependency checks
+
+Local HTTP launches bind to `127.0.0.1` by default. Set `HOST=0.0.0.0`
+explicitly when exposing the service; the Docker image already does so.
+Origin validation remains enabled. Configure `AMIRA_ALLOWED_ORIGINS` for
+trusted browser clients and put a public endpoint behind an HTTPS proxy.
+
+`npm run audit:prod` checks runtime dependencies; `npm run audit` includes the
+development-only MCPB packaging CLI. CI and both publishing workflows gate on
+the full audit. On 9 September 2026 both audits reported zero vulnerabilities.
+
+MCPB 2.1.2 still resolves an old `tmp` through its interactive editor dependencies.
+A scoped override selects `tmp` 0.2.7 or a compatible patch, resolving
+[the path-traversal advisory](https://github.com/advisories/GHSA-ph9p-34f9-6g65)
+and the older temporary-directory advisory. Regression tests exercise the editor's
+file lifecycle and rejection of unsafe path options. This chain is excluded
+from runtime bundles. Remove the override when MCPB fixes it upstream; audit
+results change over time, so rerun before release.

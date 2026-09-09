@@ -14,3 +14,6 @@ export { generateItemCitation } from "./citation.js";
 export { createAmiraServer } from "./mcpServer.js";
 export { exposureLevel } from "./exposure.js";
 export { isTemplatePlaceholder, parseAllowedOriginHostnames, config } from "./config.js";
+
+export { publicationBibtex } from "./publicationCitation.js";
+export { BRIDGE_JS } from "./ui/shell.js";

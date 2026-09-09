@@ -1,5 +1,11 @@
 # AMIRA MCP Server
 
+[![CI](https://github.com/AM-Digital-Research-Environment/amira-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/AM-Digital-Research-Environment/amira-mcp-server/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/AM-Digital-Research-Environment/amira-mcp-server)](https://github.com/AM-Digital-Research-Environment/amira-mcp-server/releases/latest)
+[![Data refresh](https://github.com/AM-Digital-Research-Environment/amira-mcp-server/actions/workflows/refresh-data.yml/badge.svg)](https://github.com/AM-Digital-Research-Environment/amira-mcp-server/actions/workflows/refresh-data.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![MCP 2026-07-28](https://img.shields.io/badge/MCP-2026--07--28-007a50)](https://modelcontextprotocol.io/specification/2026-07-28)
+
 Read-only [Model Context Protocol](https://modelcontextprotocol.io) server for the
 **Africa Multiple Interactive Research Atlas (AMIRA)**, the research-data platform
 of the **Africa Multiple Cluster of Excellence** at the University of Bayreuth.
@@ -25,7 +31,7 @@ digitised **research items**, **people**, **institutions**, **groups**,
 **collections**, the cluster **bibliography with searchable full text** (extracted
 from the open-access PDFs) and its **journals**, **podcast episodes with
 transcripts**, and the cluster's **YouTube videos with searchable transcripts** —
-as 26 core tools an LLM can query. From one MCP interface, clients can move across
+as 27 core tools an LLM can query. From one MCP interface, clients can move across
 records and the places, languages, and subjects that connect them.
 
 Every record carries an **`amira_url`** — its public page on the Omeka S site
@@ -33,6 +39,12 @@ Every record carries an **`amira_url`** — its public page on the Omeka S site
 AMIRA focuses on the Cluster's research data. For news, events, and general
 information about the Africa Multiple Cluster of Excellence, visit
 [africamultiple.uni-bayreuth.de](https://www.africamultiple.uni-bayreuth.de/).
+
+**Coverage checked 9 September 2026:** 3,975 research items, 93 projects,
+562 publications (60 with extracted full text), 87 journals, 43 podcast episodes,
+and 140 videos. Counts are a dated snapshot; use `get_collection_overview` for
+what your running server actually holds. See the [publication guide](docs/publications.md)
+and the [roadmap](ROADMAP.md) for further improvements.
 
 ## How it gets its data — and why nothing else is needed
 
@@ -69,7 +81,8 @@ Call `get_collection_overview` first to scope the data, then drill in.
 | `list_collections` | Collections (item sets) ranked by research-item count — pair with the `collection` filter |
 | `list_categories` | Facet values: formats/genres, languages, resource types |
 | `list_years` | Date histogram of research items by year or decade — coverage over time, most-covered year/decade |
-| `search_publications` / `get_publication` | The cluster bibliography (incl. generated BibTeX) — **full-text search over the extracted open-access PDFs** (match snippets; full text opt-in + paged on detail) |
+| `search_publications` / `get_publication` | The cluster bibliography, filtered by author, subject, language, type, venue, year and full-text availability (incl. generated BibTeX) — **full-text search over the extracted open-access PDFs** (match snippets; full text opt-in + paged on detail) |
+| `list_publication_facets` | Counts by type, year, language, subject, author/editor or venue across the complete filtered bibliography; ranked and paginated |
 | `list_journals` | The journals the cluster publishes in, ranked by publication count, with ISSN and country — pair with the `venue` filter |
 | `find_related` | Cross-entity discovery: pivot from a subject/place/person/project to co-occurring entities (incl. publications) |
 | `search_podcasts` / `get_podcast` | Cluster podcast episodes with searchable transcripts; transcript text is opt-in on detail |
@@ -86,6 +99,7 @@ Call `get_collection_overview` first to scope the data, then drill in.
 | "What audio recordings are in the ILAM collection?" | `search_research_items project_id=37700 resource_type=Audio` |
 | "In which talks does anyone discuss **decoloniality**?" | `search_videos keyword=decolonial` (matches inside transcripts, flagged `matched_in`) |
 | "Which cluster publications discuss **migration control** — and what do they actually say?" | `search_publications keyword="migration control"` (matches inside the extracted full text, flagged `matched_in`) → `get_publication include_fulltext=true` |
+| "How many French-language publications are there, and of which types?" | `list_publication_facets facet=type language=fr` → `search_publications language=fr` |
 | "Which journals does the cluster publish in?" | `list_journals` (ranked by publication count) |
 | "What themes travel with **Architecture** across projects?" | `find_related entity_type=subject value=Architecture` |
 | "When was this photograph taken?" | `get_research_item` → typed `dates` (created/collected/issued/…) |
@@ -128,7 +142,7 @@ local skills directory.
 
 **Cost when unused: zero.** Skill text is never injected into the server `instructions` or into any
 tool description, so the `tools/list` payload — the part re-sent every turn — is byte-identical
-whether or not a host supports the extension. Disclosure timing stays a host decision; the four
+whether or not a host supports the extension. Disclosure timing stays a host decision; the three
 reference files load only when something actually reads them.
 
 Set `AMIRA_SKILLS=0` to drop the capability and the three methods entirely. The extension is a draft:
@@ -149,8 +163,8 @@ The `.mcpb` is the local, offline option for Claude Desktop. The same server can
 also run as a **remote Streamable HTTP endpoint** — one HTTPS URL that ChatGPT,
 Claude (web + desktop remote connectors), the OpenAI and Anthropic APIs, Cursor,
 VS Code and other clients connect to by pasting a URL (no download, always-fresh
-data). The remote surface serves the same 26 tools **plus** the
-OpenAI-compatible `search` / `fetch` tools that ChatGPT's connectors require (28
+data). The remote surface serves the same 27 tools **plus** the
+OpenAI-compatible `search` / `fetch` tools for ChatGPT research integrations (29
 total). Access is unauthenticated — the data is public and read-only.
 
 `search` takes plain keywords (matched term-by-term, not as an exact phrase),
@@ -180,9 +194,9 @@ docker build -t amira-mcp . && docker run -p 8787:8787 amira-mcp
 Endpoints: `POST /mcp` (the MCP endpoint) and `GET /healthz`. Bind with `PORT` /
 `HOST`.
 
-- **ChatGPT** → Settings → Connectors → Advanced → **Developer Mode** → add
-  `https://<your-host>/mcp`. Deep Research calls `search` + `fetch`; Developer
-  Mode can call any of the 28 tools.
+- **ChatGPT** → enable Developer mode under **Settings → Security and login**,
+  then add your server URL from ChatGPT Plugins. Research integrations use
+  `search` + `fetch`; see the [current OpenAI setup guide](https://developers.openai.com/api/docs/mcp#connect-in-chatgpt).
 - **Claude** (web or desktop) → Settings → Connectors → **Add custom connector**
   → `https://<your-host>/mcp`.
 - **OpenAI API** (Responses) — point the `mcp` tool at the endpoint:
@@ -212,14 +226,14 @@ User=www-data
 location /mcp { proxy_pass http://127.0.0.1:8787/mcp; proxy_buffering off; }
 ```
 
-`proxy_buffering off` keeps the Streamable-HTTP/SSE responses flowing. Running on
-the amira host lets the live refresh read the local Omeka API, so the snapshot
-stays current with no extra load.
+`proxy_buffering off` keeps the Streamable-HTTP/SSE responses flowing. The refresh uses `AMIRA_SITE_BASE` (the public HTTPS API by default), even when
+co-located with Omeka. It performs a full crawl when changes are detected;
+co-location does not eliminate API load.
 
 ## Develop / rebuild
 
 ```bash
-npm install
+npm ci
 npm run fetch-data    # crawl the public Omeka API -> ./data snapshot (~1 min)
 npm run typecheck     # tsc --noEmit
 npm run build         # esbuild -> server/{index,http,fetchCli,lib}.js
@@ -227,8 +241,8 @@ npm test              # unit tests: transform fixtures, folding, snapshot + stor
                       # and the full tool layer against a fixture snapshot via
                       # InMemoryTransport (offline)
 npm run test:live     # integration tests against the live API (network)
-npm run smoke         # spawn the stdio server, exercise all 26 tools offline
-npm run smoke:http    # spawn the HTTP server: search/fetch + parity (28 tools), CORS
+npm run smoke         # spawn the stdio server, exercise all 27 tools offline
+npm run smoke:http    # spawn the HTTP server: search/fetch + parity (29 tools), CORS
                       # preflight for both protocol revisions, and the rate limiter
 npm run weigh         # token budget report (needs ./data — run fetch-data first)
 ```
@@ -254,7 +268,7 @@ absolute cap (Claude Code truncates tool results at 25,000 tokens) is fatal, as
 is any probe whose call *failed*, since a structured refusal is ~60 tokens and
 would otherwise sail under every ceiling.
 
-Current: **7,667 tok** stdio / **8,881 tok** http surface; heaviest response is
+Current measured baseline: **8,278 tokens** stdio / **9,492 tokens** HTTP surface; heaviest response is
 `search_research_items` at `limit=100`, ~15,000 tok. Defaults are far cheaper —
 a keyword search is ~165 tok.
 
@@ -320,7 +334,7 @@ workflows crawl the **public** API — no credentials):
 | `AMIRA_EXPOSURE` | — | `full` | **Benchmark experiments only**: restrict which metadata the tools expose (see below) |
 | `AMIRA_SKILLS` | — | on | **Prototype**: serve the companion skill over the draft SEP-2640 extension. `0`/`false`/`off` withdraws the capability and the `skills/*` methods |
 | `PORT` | — | `8787` | Port for the remote HTTP transport (`server/http.js`); ignored by the `.mcpb` |
-| `HOST` | — | `0.0.0.0` | Bind address for the remote HTTP transport |
+| `HOST` | — | `127.0.0.1` | HTTP bind address; set `0.0.0.0` explicitly for remote access. The Docker image sets this itself |
 | `AMIRA_ALLOWED_ORIGINS` | — | `localhost, 127.0.0.1, [::1]` | Comma-separated browser Origin hostnames or URLs allowed to call the HTTP endpoint. Server-to-server clients, which omit `Origin`, are unaffected. Add trusted web-client origins explicitly; wildcards are rejected. |
 | `AMIRA_RATE_LIMIT` | — | `120` | Requests/minute per client on `/mcp` (`0` disables). A courtesy cap — every query scans the whole in-memory snapshot — not a security control; `/healthz` is exempt |
 | `AMIRA_TRUST_PROXY` | — | `false` | Read the client IP from `X-Forwarded-For` for rate limiting. Enable **only** behind a proxy that sets it; a direct client can forge the header |
@@ -360,7 +374,7 @@ it cannot answer rather than hallucinating.
   (NFD, drop combining marks, lowercase), so the answer no longer depends on
   which spelling the caller guessed. Folds of large texts are memoised and
   dropped when a refresh replaces the snapshot.
-- **Interactive results (MCP Apps).** Two tools carry `_meta.ui.resourceUri`
+- **Interactive results (MCP Apps).** Four tools carry `_meta.ui.resourceUri`
   pointing at a `text/html;profile=mcp-app` resource, so hosts implementing the
   [`io.modelcontextprotocol/ui`](https://modelcontextprotocol.io/docs/extensions/apps)
   extension (Claude, Claude Desktop) render the result inline. Every other
@@ -395,6 +409,8 @@ it cannot answer rather than hallucinating.
 
 ### Protocol posture
 
+Verified against the [current specification](https://modelcontextprotocol.io/specification/2026-07-28)
+and [TypeScript SDK documentation](https://ts.sdk.modelcontextprotocol.io/v2/) on 9 September 2026.
 The server speaks MCP **2026-07-28** on both transports, and still answers
 2025-era clients unchanged.
 
@@ -439,7 +455,6 @@ this repository** button will render BibTeX and APA for you.
   year      = {2026},
   publisher = {Africa Multiple Cluster of Excellence, University of Bayreuth},
   url       = {https://github.com/AM-Digital-Research-Environment/amira-mcp-server},
-  version   = {1.12.0},
   license   = {MIT}
 }
 ```

@@ -29,7 +29,7 @@ function check(cond, label) {
 
 const tools = await client.listTools();
 console.log(`tools (${tools.tools.length}):`, tools.tools.map((t) => t.name).join(", "));
-check(tools.tools.length === 26, `expected 26 tools, got ${tools.tools.length}`);
+check(tools.tools.length === 27, `expected 27 tools, got ${tools.tools.length}`);
 
 async function call(name, args, { expect = [] } = {}) {
   const res = await client.callTool({ name, arguments: args });

@@ -9,6 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   isStale,
+  crawlSnapshot,
   loadSnapshot,
   SNAPSHOT_SCHEMA_VERSION,
   writeSnapshot,
@@ -30,6 +31,60 @@ test("write → load roundtrip preserves data and manifest", async (t) => {
   assert.equal(loaded.data.research_items.length, out.data.research_items.length);
   assert.equal(loaded.data.journals.length, out.data.journals.length);
   assert.equal(loaded.data.publications[0].fulltext, out.data.publications[0].fulltext);
+});
+
+test("snapshots reject missing counts and duplicate identifiers", async (t) => {
+  const dir = await tempDir();
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const out = buildFixture(SNAPSHOT_SCHEMA_VERSION);
+  delete out.manifest.counts.persons;
+  await writeSnapshot(dir, out);
+  await assert.rejects(loadSnapshot(dir), /persons/);
+  const duplicate = buildFixture(SNAPSHOT_SCHEMA_VERSION);
+  duplicate.data.persons[1].o_id = duplicate.data.persons[0].o_id;
+  await writeSnapshot(dir, duplicate);
+  await assert.rejects(loadSnapshot(dir), /duplicate Omeka ids/);
+});
+
+function mockCrawl(t, { changes = false, duplicates = false, missingTotal = false } = {}) {
+  let probes = 0;
+  const requests = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    const u = new URL(url);
+    requests.push(u);
+    const isProbe = u.searchParams.get("sort_by") === "modified";
+    if (isProbe) probes++;
+    const date = changes && probes > 1 ? "2026-09-10T00:00:00+00:00" : "2026-09-09T00:00:00+00:00";
+    const body = isProbe ? [{ "o:id": 999, "o:modified": { "@value": date } }]
+      : duplicates && u.searchParams.get("resource_template_id") === "4" ? [{ "o:id": 1 }, { "o:id": 1 }] : [];
+    return new Response(JSON.stringify(body), { headers: missingTotal ? {} : {
+      "omeka-s-total-results": String(isProbe ? 999 : body.length),
+    } });
+  });
+  return requests;
+}
+
+test("freshness signature includes authorities outside the selected corpora", async (t) => {
+  const requests = mockCrawl(t);
+  const out = await crawlSnapshot("https://example.test/api");
+  assert.equal(out.manifest.maxModified, "2026-09-09T00:00:00+00:00");
+  assert.equal(isStale(out.manifest, { maxModified: out.manifest.maxModified, totalItems: 999 }), false);
+  assert.ok(requests.filter((u) => u.searchParams.has("page") && u.pathname.endsWith("items"))
+    .every((u) => u.searchParams.get("sort_by") === "id" && u.searchParams.get("sort_order") === "asc"));
+  assert.ok(requests.some((u) => u.searchParams.get("item_set_id") === "29918" && !u.searchParams.has("resource_template_id")));
+});
+
+test("a changing upstream, duplicate pages or missing totals never become a snapshot", async (t) => {
+  for (const [opts, message] of [
+    [{ changes: true }, /changed during the crawl/],
+    [{ duplicates: true }, /duplicate item ids/],
+    [{ missingTotal: true }, /invalid item list or total-results/],
+  ]) {
+    await t.test(JSON.stringify(opts), async (sub) => {
+      mockCrawl(sub, opts);
+      await assert.rejects(crawlSnapshot("https://example.test/api"), message);
+    });
+  }
 });
 
 test("a snapshot with the wrong schema version is rejected", async (t) => {

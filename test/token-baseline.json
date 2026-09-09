@@ -2,21 +2,22 @@
   "_comment": "Token baseline for the AMIRA tool layer, in bytes/4 estimated tokens. Regenerate with `npm run weigh -- --update` and commit the diff: the cost of a schema or summary change belongs in code review. See scripts/weigh.mjs for the two budgets and why drift is fatal for the surface but only a warning for responses.",
   "surface": {
     "stdio": {
-      "tool_count": 26,
-      "total_chars": 31228,
-      "total_tokens": 7836,
+      "tool_count": 27,
+      "total_chars": 33001,
+      "total_tokens": 8278,
       "tools": {
-        "search_research_items": 678,
-        "search_publications": 542,
+        "search_research_items": 673,
+        "list_publication_facets": 621,
         "find_related": 434,
+        "search_publications": 394,
         "list_years": 383,
-        "get_publication": 377,
+        "get_publication": 370,
         "search_videos": 363,
         "search_projects": 360,
-        "get_research_item": 342,
+        "get_research_item": 338,
         "search_podcasts": 336,
-        "get_podcast": 318,
-        "get_video": 312,
+        "get_podcast": 313,
+        "get_video": 307,
         "list_categories": 264,
         "list_research_sections": 260,
         "list_locations": 258,
@@ -24,8 +25,8 @@
         "search_persons": 232,
         "get_person": 227,
         "list_institutions": 226,
-        "get_project": 223,
         "list_cluster_partners": 221,
+        "get_project": 218,
         "list_subjects": 216,
         "get_collection_overview": 213,
         "list_collections": 212,
@@ -35,23 +36,24 @@
       }
     },
     "http": {
-      "tool_count": 28,
-      "total_chars": 36066,
-      "total_tokens": 9050,
+      "tool_count": 29,
+      "total_chars": 37839,
+      "total_tokens": 9492,
       "tools": {
         "fetch": 732,
-        "search_research_items": 678,
-        "search_publications": 542,
+        "search_research_items": 673,
+        "list_publication_facets": 621,
         "search": 482,
         "find_related": 434,
+        "search_publications": 394,
         "list_years": 383,
-        "get_publication": 377,
+        "get_publication": 370,
         "search_videos": 363,
         "search_projects": 360,
-        "get_research_item": 342,
+        "get_research_item": 338,
         "search_podcasts": 336,
-        "get_podcast": 318,
-        "get_video": 312,
+        "get_podcast": 313,
+        "get_video": 307,
         "list_categories": 264,
         "list_research_sections": 260,
         "list_locations": 258,
@@ -59,8 +61,8 @@
         "search_persons": 232,
         "get_person": 227,
         "list_institutions": 226,
-        "get_project": 223,
         "list_cluster_partners": 221,
+        "get_project": 218,
         "list_subjects": 216,
         "get_collection_overview": 213,
         "list_collections": 212,
@@ -132,8 +134,32 @@
       "chars": 15282
     },
     "search_publications@max": {
-      "tokens": 11107,
-      "chars": 44371
+      "tokens": 11090,
+      "chars": 44300
+    },
+    "list_publication_facets@type": {
+      "tokens": 187,
+      "chars": 745
+    },
+    "list_publication_facets@year": {
+      "tokens": 144,
+      "chars": 575
+    },
+    "list_publication_facets@language": {
+      "tokens": 88,
+      "chars": 350
+    },
+    "list_publication_facets@subject": {
+      "tokens": 3122,
+      "chars": 12484
+    },
+    "list_publication_facets@author": {
+      "tokens": 2965,
+      "chars": 11845
+    },
+    "list_publication_facets@venue": {
+      "tokens": 2592,
+      "chars": 10357
     },
     "list_journals@max": {
       "tokens": 7062,
@@ -172,8 +198,8 @@
       "chars": 8574
     },
     "get_publication@fulltext": {
-      "tokens": 7141,
-      "chars": 28359
+      "tokens": 7154,
+      "chars": 28412
     },
     "get_podcast@transcript": {
       "tokens": 6384,

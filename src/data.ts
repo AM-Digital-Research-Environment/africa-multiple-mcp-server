@@ -133,6 +133,7 @@ export class DataStore {
     }
     for (const p of this.publications) {
       this.publicationByPubId.set(fold(p.pub_id), p);
+      for (const id of p.identifiers ?? []) this.publicationByPubId.set(fold(id), p);
       this.publicationByOId.set(p.o_id, p);
     }
     for (const j of this.journals) this.journalByOId.set(j.o_id, j);

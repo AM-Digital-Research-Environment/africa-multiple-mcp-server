@@ -23,6 +23,7 @@ jobs:
           node-version: "26"
           cache: npm
       - run: npm ci
+      - run: npm run audit
       # CITATION.cff ships inside the .mcpb, so stamp it before anything is
       # packed. On a tag this takes the version from the tag; on a manual run
       # there is no tag, so it falls back to package.json and the file is

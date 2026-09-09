@@ -34,11 +34,20 @@ Before opening a PR, run what CI runs:
 
 ```bash
 npm run prepack-mcpb
+npm run audit
 ```
 
-That chains clean → typecheck → unit tests → stdio smoke → HTTP smoke →
-`weigh --check` → `validate:manifest`. CI additionally runs `npm run test:live`
-(hits the real API) and `npm run audit:prod` on release.
+That chains clean → typecheck → skill validation → unit tests → stdio smoke → HTTP smoke →
+`weigh --check` → `validate:manifest`. Release and data-refresh workflows additionally run `npm run test:live`
+(hits the real API). CI, release and data-refresh workflows run `npm run audit`,
+including development dependencies; `npm run audit:prod` checks only runtime dependencies.
+The test launcher enumerates files so `npm test` works on Node 20 and Windows.
+
+MCPB's editor currently needs a scoped `tmp` override to resolve its packaging
+advisory. The packaging unit tests exercise the actual editor dependency's file
+lifecycle and rejection of unsafe path options. Remove the override when an
+upstream MCPB update supplies a patched dependency; rerun the tests and pack a
+real `.mcpb` after changing this chain.
 
 ## Things that will be asked in review
 
@@ -79,3 +88,11 @@ happened and cannot be derived from the working tree.
 
 Short imperative subject, and say what changed in behaviour rather than which
 files moved. The history reads as a changelog — keep it readable.
+
+## Publication changes
+
+Use item set **29918**, never a range of publication template ids. Search and
+facets share `src/publicationQuery.ts`; add filters there so counts and retrieval
+agree. Preserve all repository identities during transformation. Keep optional
+v4 fields backwards compatible, or bump the snapshot schema for required changes.
+See [the publication guide](docs/publications.md) and [roadmap](ROADMAP.md).

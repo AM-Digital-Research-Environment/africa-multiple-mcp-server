@@ -1,6 +1,6 @@
 # Tools by task
 
-All 26 tools are read-only. Results are compact JSON. Search/list tools return a pagination envelope:
+All 27 tools are read-only. Results are compact JSON. Search/list tools return a pagination envelope:
 `{ count, total_matches, offset, has_more, next_offset?, results[] }` (plus a `filters` echo of the
 filters you actually passed). Ask for more than a tool's max and it also echoes `requested_limit` /
 `effective_limit`. `search_research_items` adds `suggestions` (which filter to drop) when a strict
@@ -83,8 +83,9 @@ read the numbers from the payload and cite as usual.
 
 | Task | Tool | Key params |
 | --- | --- | --- |
-| Search publications — incl. INSIDE full text | `search_publications` | `keyword` (title, abstract, venue, subjects, and the extracted full text of open-access PDFs — full-text hits flagged `matched_in: "fulltext"` + a `fulltext_snippet`), `author`, `type`, `venue`, `has_fulltext`, `year_from`/`year_to` |
+| Search publications — incl. INSIDE full text | `search_publications` | `keyword` (title, abstract, venue, subjects, and the extracted full text of open-access PDFs — full-text hits flagged `matched_in: "fulltext"` + a `fulltext_snippet`), `author`, `type`, `venue`, `subject`, `language`, `has_fulltext`, `year_from`/`year_to` |
 | Full publication + BibTeX (full text opt-in) | `get_publication` | Omeka `id` — BibTeX generated from the structured fields; peer-review `status`, `funders`, venue `amira_url` when it is a Journal record; `include_fulltext=true` + `fulltext_offset`/`fulltext_max_chars` for the extracted text (cap 25k chars/call — full texts run ~100k, always page) |
+| Count publication types, years, languages, subjects, authors/editors or venues | `list_publication_facets` | `facet` plus the same filters as `search_publications`; counts cover the complete filtered corpus, not just a search page. One publication counts once per value; `missing_values` reports missing metadata |
 | Journals the cluster publishes in | `list_journals` | `keyword`; ranked by publication count, with ISSN + country; feed the title into the `venue` filter |
 
 ## Podcasts & YouTube videos
